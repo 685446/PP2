@@ -3,6 +3,7 @@
 export type HomeFeedItem = {
   id: string;
   type: FeedItemType;
+  isGrouped?: boolean;
   originKind?: "thread" | "post" | "match" | "user" | "other";
   postRelation?: {
     kind: "replying-to" | "in-thread";

@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
+  CalendarDays,
   Check,
   CheckCheck,
   ChevronDown,
+  ChevronUp,
+  Clock3,
   LoaderCircle,
   PencilLine,
   Quote,
@@ -15,7 +18,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
-  Trophy,
   X,
 } from "lucide-react";
 import {
@@ -25,7 +27,7 @@ import {
   type StoredAuthSession,
 } from "@/components/auth/session";
 import FeedCard from "@/components/home/FeedCard";
-import { GUEST_FEED_ITEMS, PREVIEW_FEED_ITEMS, PREVIEW_NON_MATCH_FEED_ITEMS } from "@/components/home/feedData";
+import { GUEST_FEED_ITEMS } from "@/components/home/feedData";
 import { normalizeFeedItems, type ApiFeedResponse } from "@/components/home/feedMapper";
 import type { FeedItemType, HomeFeedItem } from "@/components/home/types";
 import ThreadComposerForm from "@/components/shared/ThreadComposerForm";
@@ -41,8 +43,31 @@ import {
 
 type FavoriteTeamState = {
   teamName: string | null;
+  teamCrestUrl: string | null;
+  previousFixture: FavoriteTeamMatchRecord | null;
+  nextFixture: FavoriteTeamMatchRecord | null;
   isLoading: boolean;
   error: string | null;
+};
+
+type FavoriteTeamMatchTeam = {
+  id: number;
+  name: string;
+  shortName: string;
+  crestUrl: string | null;
+};
+
+type FavoriteTeamMatchRecord = {
+  id: number;
+  utcDate: string;
+  status: string;
+  matchWeek: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  homeTeamId: number;
+  awayTeamId: number;
+  homeTeam: FavoriteTeamMatchTeam;
+  awayTeam: FavoriteTeamMatchTeam;
 };
 
 type FeedState = {
@@ -76,6 +101,9 @@ type HomeComposerState = ThreadComposerCoreState;
 
 const INITIAL_TEAM_STATE: FavoriteTeamState = {
   teamName: null,
+  teamCrestUrl: null,
+  previousFixture: null,
+  nextFixture: null,
   isLoading: false,
   error: null,
 };
@@ -110,6 +138,52 @@ const HOME_ACTIVITY_FILTER_OPTIONS: Array<{ value: HomeActivityFilterValue; labe
 const HOME_ALL_ACTIVITY_TYPES = HOME_ACTIVITY_FILTER_OPTIONS.map(
   (option) => option.value
 ) as HomeActivityFilterValue[];
+
+function getCurrentSeasonLabel(now = new Date()) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const startYear = month >= 6 ? year : year - 1;
+  const endYear = String((startYear + 1) % 100).padStart(2, "0");
+  return `${startYear}-${endYear}`;
+}
+
+function isFinishedMatchStatus(status: string) {
+  const normalized = status.toUpperCase();
+  return normalized === "FINISHED" || normalized === "AWARDED";
+}
+
+function formatFixtureKickoff(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Kickoff TBD";
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatFixtureStatus(status: string) {
+  const normalized = status.toUpperCase();
+  if (normalized === "FINISHED") return "FT";
+  if (normalized === "IN_PLAY") return "LIVE";
+  if (normalized === "PAUSED") return "HT";
+  if (normalized === "TIMED" || normalized === "SCHEDULED") return "Scheduled";
+  return normalized;
+}
+
+function pickFavoriteTeamFixtures(matches: FavoriteTeamMatchRecord[]) {
+  const sortedMatches = [...matches].sort(
+    (a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()
+  );
+  const previousFixture =
+    [...sortedMatches].reverse().find((match) => isFinishedMatchStatus(match.status)) ?? null;
+  const nextFixture =
+    sortedMatches.find((match) => !isFinishedMatchStatus(match.status)) ?? null;
+
+  return { previousFixture, nextFixture };
+}
 
 function formatDigestTimestamp(value: string | null) {
   if (!value) return null;
@@ -154,7 +228,7 @@ function SignedOutMyTeamCard() {
 
       <h2 className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">Personalized team updates are locked</h2>
       <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-        Sign in to follow your favorite team and get match updates, thread activity, and standings changes in one place.
+        Sign in to follow your favorite team, jump into club discussions, and keep your next fixtures close by.
       </p>
     </div>
   );
@@ -182,11 +256,124 @@ function SignedInNoFavoriteTeamCard() {
 
 function SignedInFavoriteTeamCard({
   teamName,
+  teamCrestUrl,
   favoriteTeamId,
+  previousFixture,
+  nextFixture,
 }: {
   teamName: string;
+  teamCrestUrl: string | null;
   favoriteTeamId: number;
+  previousFixture: FavoriteTeamMatchRecord | null;
+  nextFixture: FavoriteTeamMatchRecord | null;
 }) {
+  const renderTeamSlot = (
+    team: FavoriteTeamMatchTeam,
+    align: "left" | "right"
+  ) =>
+    align === "left" ? (
+      <div className="flex min-w-0 flex-col items-start gap-2 text-left">
+        {team.crestUrl ? (
+          <img
+            src={team.crestUrl}
+            alt={`${team.name} crest`}
+            className="h-10 w-10 object-contain"
+          />
+        ) : (
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)]">
+            <ShieldCheck className="h-4 w-4 text-sky-500" />
+          </span>
+        )}
+        <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+          {team.shortName || team.name}
+        </p>
+      </div>
+    ) : (
+      <div className="flex min-w-0 flex-col items-end gap-2 text-right">
+        {team.crestUrl ? (
+          <img
+            src={team.crestUrl}
+            alt={`${team.name} crest`}
+            className="h-10 w-10 object-contain"
+          />
+        ) : (
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)]">
+            <ShieldCheck className="h-4 w-4 text-sky-500" />
+          </span>
+        )}
+        <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+          {team.shortName || team.name}
+        </p>
+      </div>
+    );
+
+  const renderFixtureCard = (
+    fixture: FavoriteTeamMatchRecord | null,
+    variant: "previous" | "next"
+  ) => {
+    const title = variant === "previous" ? "Previous Fixture" : "Next Fixture";
+
+    if (!fixture) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <CalendarDays className="h-4 w-4 text-sky-500" />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">{title}</p>
+          </div>
+          <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+            <p className="text-sm text-[color:var(--muted-foreground)]">
+              {variant === "previous"
+                ? "No completed fixture to show yet."
+                : "No upcoming fixture is scheduled yet."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const statusLabel = formatFixtureStatus(fixture.status);
+    const hasScore = fixture.homeScore !== null && fixture.awayScore !== null;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-sky-500" />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">{title}</p>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-400">
+            <Clock3 className="h-3.5 w-3.5" />
+            {statusLabel}
+          </span>
+        </div>
+
+        <Link
+          href={`/matches/${fixture.id}`}
+          className="block rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4 transition hover:border-sky-500/45 hover:bg-[color:var(--surface)]"
+        >
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            {renderTeamSlot(fixture.homeTeam, "left")}
+
+            <div className="text-center">
+              <p className="text-xl font-black tracking-tight text-[color:var(--foreground)]">
+                {hasScore ? `${fixture.homeScore} - ${fixture.awayScore}` : "vs"}
+              </p>
+              <p className="mt-1 text-[11px] text-[color:var(--muted-foreground)]">
+                {fixture.matchWeek != null ? `MW ${fixture.matchWeek}` : "Premier League"}
+              </p>
+            </div>
+
+            {renderTeamSlot(fixture.awayTeam, "right")}
+          </div>
+
+          <div className="mt-3 text-xs text-[color:var(--muted-foreground)]">
+            {formatFixtureKickoff(fixture.utcDate)}
+          </div>
+        </Link>
+      </div>
+    );
+  };
+
   return (
     <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_8px_22px_rgba(2,8,23,0.06)]">
       <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-xs font-semibold text-sky-500">
@@ -194,25 +381,30 @@ function SignedInFavoriteTeamCard({
         My Team
       </div>
 
-      <h2 className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">{teamName}</h2>
-      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-        You will see your team-focused activity here first: fresh fixtures, results, and conversation spikes.
-      </p>
+      <div className="mt-3 flex items-center gap-3">
+        {teamCrestUrl ? (
+          <img src={teamCrestUrl} alt={`${teamName} crest`} className="h-11 w-11 object-contain" />
+        ) : (
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)]">
+            <ShieldCheck className="h-5 w-5 text-sky-500" />
+          </span>
+        )}
+        <div>
+          <h2 className="text-lg font-semibold text-[color:var(--foreground)]">{teamName}</h2>
+          <p className="text-sm text-[color:var(--muted-foreground)]">
+            Quick fixture context lives here. Match pages can take you into the thread when you need it.
+          </p>
+        </div>
+      </div>
 
-      <ul className="mt-4 space-y-2 text-sm text-[color:var(--muted-foreground)]">
-        <li className="flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-sky-500" />
-          Latest fixtures and scores
-        </li>
-        <li className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-sky-500" />
-          New thread activity in your team community
-        </li>
-      </ul>
+      <div className="mt-4 space-y-3">
+        {renderFixtureCard(previousFixture, "previous")}
+        {renderFixtureCard(nextFixture, "next")}
+      </div>
 
       <div className="mt-4 flex flex-col gap-2">
         <Link href={`/matches?teamId=${favoriteTeamId}`} className="btn-secondary justify-between">
-          View Team Matches
+          All Fixtures
           <ArrowRight className="h-4 w-4" />
         </Link>
         <Link href={`/communities/${favoriteTeamId}`} className="btn-secondary justify-between">
@@ -464,10 +656,57 @@ function FeedEndState({ isAuthenticated }: { isAuthenticated: boolean }) {
 
       <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">
         {isAuthenticated
-          ? "New match and discussion activity will appear here automatically."
-          : "Create an account to follow teams, threads, and match updates."}
+          ? "New replies, followed-user activity, and team community updates will appear here automatically."
+          : "Create an account to follow teams and personalize your home feed."}
       </p>
     </div>
+  );
+}
+
+function HomeSidebarContent({
+  session,
+  favoriteTeamId,
+  favoriteTeam,
+  digestState,
+}: {
+  session: StoredAuthSession | null;
+  favoriteTeamId: number | null;
+  favoriteTeam: FavoriteTeamState;
+  digestState: DigestState;
+}) {
+  return (
+    <>
+      {!session && <SignedOutMyTeamCard />}
+
+      {session && !favoriteTeamId && <SignedInNoFavoriteTeamCard />}
+
+      {session && favoriteTeamId && favoriteTeam.isLoading && (
+        <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 text-sm text-[color:var(--muted-foreground)] shadow-[0_8px_22px_rgba(2,8,23,0.06)]">
+          Loading your team panel...
+        </div>
+      )}
+
+      {session && favoriteTeamId && !favoriteTeam.isLoading && favoriteTeam.teamName && (
+        <SignedInFavoriteTeamCard
+          teamName={favoriteTeam.teamName}
+          teamCrestUrl={favoriteTeam.teamCrestUrl}
+          favoriteTeamId={favoriteTeamId}
+          previousFixture={favoriteTeam.previousFixture}
+          nextFixture={favoriteTeam.nextFixture}
+        />
+      )}
+
+      {session && favoriteTeam.error && (
+        <p className="mt-2 text-xs text-[color:var(--muted-foreground)]">
+          Team panel data is partially available. You can still open the community and match center.
+        </p>
+      )}
+
+      <DailyDigestCard
+        isAuthenticated={Boolean(session)}
+        digestState={digestState}
+      />
+    </>
   );
 }
 
@@ -502,6 +741,7 @@ export default function HomeFeedShell() {
   const [isActivityMenuOpen, setIsActivityMenuOpen] = useState(false);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<HomeActivityFilterValue[]>(HOME_ALL_ACTIVITY_TYPES);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [mobilePanelsOpen, setMobilePanelsOpen] = useState(false);
   const [composerPending, setComposerPending] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [composer, setComposer] = useState<HomeComposerState>({
@@ -562,21 +802,49 @@ export default function HomeFeedShell() {
     }
 
     const controller = new AbortController();
-    setFavoriteTeam({ teamName: null, isLoading: true, error: null });
+    setFavoriteTeam({
+      teamName: null,
+      teamCrestUrl: null,
+      previousFixture: null,
+      nextFixture: null,
+      isLoading: true,
+      error: null,
+    });
 
-    const loadTeamName = async () => {
+    const loadTeamPanel = async () => {
       try {
-        const response = await fetch(`/api/teams/${favoriteTeamId}`, {
-          signal: controller.signal,
-        });
+        const season = getCurrentSeasonLabel();
+        const [teamResponse, matchesResponse] = await Promise.all([
+          fetch(`/api/teams/${favoriteTeamId}`, {
+            signal: controller.signal,
+            cache: "no-store",
+          }),
+          fetch(`/api/matches?teamId=${favoriteTeamId}&season=${encodeURIComponent(season)}`, {
+            signal: controller.signal,
+            cache: "no-store",
+          }),
+        ]);
 
-        if (!response.ok) {
+        if (!teamResponse.ok) {
           throw new Error("team_lookup_failed");
         }
 
-        const team = (await response.json()) as { name?: string };
+        const [team, matchesPayload] = await Promise.all([
+          teamResponse.json() as Promise<{ name?: string; crestUrl?: string | null }>,
+          matchesResponse.json().catch(() => ({})) as Promise<{ data?: FavoriteTeamMatchRecord[]; error?: string }>,
+        ]);
+
+        if (!matchesResponse.ok) {
+          throw new Error(matchesPayload.error || "matches_lookup_failed");
+        }
+
+        const fixtureRows = Array.isArray(matchesPayload.data) ? matchesPayload.data : [];
+        const { previousFixture, nextFixture } = pickFavoriteTeamFixtures(fixtureRows);
         setFavoriteTeam({
           teamName: team.name ?? `Team #${favoriteTeamId}`,
+          teamCrestUrl: team.crestUrl ?? null,
+          previousFixture,
+          nextFixture,
           isLoading: false,
           error: null,
         });
@@ -584,13 +852,16 @@ export default function HomeFeedShell() {
         if (controller.signal.aborted) return;
         setFavoriteTeam({
           teamName: `Team #${favoriteTeamId}`,
+          teamCrestUrl: null,
+          previousFixture: null,
+          nextFixture: null,
           isLoading: false,
           error: error instanceof Error ? error.message : "team_lookup_failed",
         });
       }
     };
 
-    void loadTeamName();
+    void loadTeamPanel();
 
     return () => controller.abort();
   }, [favoriteTeamId]);
@@ -812,6 +1083,25 @@ export default function HomeFeedShell() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [composerOpen, composerPending]);
 
+  useEffect(() => {
+    if (!mobilePanelsOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobilePanelsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobilePanelsOpen]);
+
   const sortedItems = useMemo(
     () => [...feedState.items].sort((a, b) => b.createdAtMs - a.createdAtMs),
     [feedState.items]
@@ -834,33 +1124,19 @@ export default function HomeFeedShell() {
     [selectedActivitySet]
   );
 
-  const showPreviewCards = Boolean(session) && feedState.status === "ready" && sortedItems.length === 0;
   const hasMoreFeedPages =
     Boolean(session) &&
     feedState.status === "ready" &&
     feedState.page < feedState.totalPages &&
-    !showPreviewCards;
-  const baseDisplayItems = showPreviewCards ? PREVIEW_FEED_ITEMS : sortedItems;
+    true;
   const displayItems = useMemo(
-    () => baseDisplayItems.filter((item) => isItemVisibleForFilters(item)),
-    [baseDisplayItems, isItemVisibleForFilters]
+    () => sortedItems.filter((item) => isItemVisibleForFilters(item)),
+    [sortedItems, isItemVisibleForFilters]
   );
-  const filteredPreviewNonMatchItems = useMemo(
-    () => PREVIEW_NON_MATCH_FEED_ITEMS.filter((item) => isItemVisibleForFilters(item)),
-    [isItemVisibleForFilters]
-  );
-  const showNonMatchPreviewCards =
-    Boolean(session) &&
-    feedState.status === "ready" &&
-    sortedItems.length > 0 &&
-    sortedItems.every((item) => item.type === "team-update") &&
-    filteredPreviewNonMatchItems.length > 0;
   const showFilterEmptyState =
     feedState.status === "ready" &&
-    !showPreviewCards &&
     sortedItems.length > 0 &&
-    displayItems.length === 0 &&
-    !showNonMatchPreviewCards;
+    displayItems.length === 0;
   const loginHref = `/login?next=${encodeURIComponent("/")}`;
 
   const handleLoadMoreFeed = useCallback(async () => {
@@ -1113,20 +1389,9 @@ export default function HomeFeedShell() {
             <FeedEmptyState isAuthenticated={Boolean(session)} />
           )}
 
-          {showPreviewCards && <FeedPreviewBanner />}
-
           {feedState.status === "ready" &&
             displayItems.length > 0 &&
             displayItems.map((item) => <FeedCard key={item.id} item={item} />)}
-
-          {showNonMatchPreviewCards && (
-            <>
-              <FeedPreviewSecondaryBanner />
-              {filteredPreviewNonMatchItems.map((item) => (
-                <FeedCard key={item.id} item={item} />
-              ))}
-            </>
-          )}
 
           {showFilterEmptyState && <FeedFilterEmptyState onReset={resetActivityFilter} />}
 
@@ -1136,34 +1401,16 @@ export default function HomeFeedShell() {
 
           {feedState.status === "ready" &&
             !hasMoreFeedPages &&
-            (displayItems.length > 0 || showNonMatchPreviewCards) && (
+            displayItems.length > 0 && (
             <FeedEndState isAuthenticated={Boolean(session)} />
           )}
           </div>
 
-          <aside className="xl:sticky xl:top-24">
-            {!session && <SignedOutMyTeamCard />}
-
-            {session && !favoriteTeamId && <SignedInNoFavoriteTeamCard />}
-
-            {session && favoriteTeamId && favoriteTeam.isLoading && (
-              <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 text-sm text-[color:var(--muted-foreground)] shadow-[0_8px_22px_rgba(2,8,23,0.06)]">
-                Loading your team panel...
-              </div>
-            )}
-
-            {session && favoriteTeamId && !favoriteTeam.isLoading && favoriteTeam.teamName && (
-              <SignedInFavoriteTeamCard teamName={favoriteTeam.teamName} favoriteTeamId={favoriteTeamId} />
-            )}
-
-            {session && favoriteTeam.error && (
-              <p className="mt-2 text-xs text-[color:var(--muted-foreground)]">
-                Team data is partially available. You can still open matches and your community.
-              </p>
-            )}
-
-            <DailyDigestCard
-              isAuthenticated={Boolean(session)}
+          <aside className="hidden xl:sticky xl:top-24 xl:block">
+            <HomeSidebarContent
+              session={session}
+              favoriteTeamId={favoriteTeamId}
+              favoriteTeam={favoriteTeam}
               digestState={digestState}
             />
           </aside>
@@ -1172,13 +1419,66 @@ export default function HomeFeedShell() {
 
       <button
         type="button"
+        onClick={() => setMobilePanelsOpen(true)}
+        className="fixed bottom-6 left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-sky-500/30 bg-[color:var(--surface)] px-4 py-2.5 text-sm font-semibold text-[color:var(--foreground)] shadow-[0_14px_34px_rgba(2,8,23,0.28)] transition hover:border-sky-500/45 hover:bg-[color:var(--surface-elevated)] xl:hidden"
+        aria-label="Open team hub"
+      >
+        <Star className="h-4 w-4 text-sky-500" />
+        Team Hub
+        <ChevronUp className="h-4 w-4 text-[color:var(--muted-foreground)]" />
+      </button>
+
+      <button
+        type="button"
         onClick={() => setComposerOpen(true)}
-        className="fixed bottom-6 right-6 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_14px_34px_rgba(2,132,199,0.45)] transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+        className="fixed bottom-20 right-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_14px_34px_rgba(2,132,199,0.45)] transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 sm:bottom-6 sm:right-6 xl:bottom-6 xl:right-6"
         aria-label="Create thread"
         title="Create thread"
       >
         <PencilLine className="h-5 w-5" />
       </button>
+
+      {mobilePanelsOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/45 xl:hidden"
+          onClick={() => setMobilePanelsOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Team hub"
+            onClick={(event) => event.stopPropagation()}
+            className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-hidden rounded-t-[28px] border border-b-0 border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_-18px_44px_rgba(2,8,23,0.35)]"
+          >
+            <div className="flex items-center justify-between border-b border-[color:var(--surface-border)] px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">Team Hub</p>
+                <h2 className="mt-1 text-lg font-bold text-[color:var(--foreground)]">
+                  My Team and Daily Digest
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobilePanelsOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] text-[color:var(--muted-foreground)] transition hover:text-[color:var(--foreground)]"
+                aria-label="Close team hub"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(78vh-78px)] overflow-y-auto px-4 pb-6 pt-4">
+              <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[color:var(--surface-border)]" />
+              <HomeSidebarContent
+                session={session}
+                favoriteTeamId={favoriteTeamId}
+                favoriteTeam={favoriteTeam}
+                digestState={digestState}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {composerOpen && (
         <div

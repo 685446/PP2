@@ -8,13 +8,38 @@ const SYSTEM_USER_AVATAR =
   process.env.SYSTEM_USER_AVATAR || "/branding/logo_full_color_notext.png";
 const SYSTEM_USER_BIO =
   "Automated account for match threads and moderation actions";
+const seededThreadCreatedAt = new Map<number, Date>();
+const threadActivityOffsets = new Map<number, number>();
+
+function recentDate(daysAgo: number, hour: number, minute = 0) {
+  const date = new Date();
+  date.setSeconds(0, 0);
+  date.setHours(hour, minute, 0, 0);
+  date.setDate(date.getDate() - daysAgo);
+  return date;
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
+function nextPostTimestamp(threadId: number) {
+  const base = seededThreadCreatedAt.get(threadId) ?? recentDate(7, 12, 0);
+  const index = threadActivityOffsets.get(threadId) ?? 0;
+  const spacingMinutes = 17 + (threadId % 5) * 4;
+  const createdAt = addMinutes(base, 25 + index * spacingMinutes);
+  threadActivityOffsets.set(threadId, index + 1);
+  return createdAt;
+}
 
 async function ensurePost(data: {
   content: string;
   threadId: number;
   authorId: number;
   parentId?: number | null;
+  createdAt?: Date;
 }) {
+  const createdAt = data.createdAt ?? nextPostTimestamp(data.threadId);
   const existing = await prisma.post.findFirst({
     where: {
       content: data.content,
@@ -24,7 +49,12 @@ async function ensurePost(data: {
     },
   });
 
-  if (existing) return existing;
+  if (existing) {
+    return prisma.post.update({
+      where: { id: existing.id },
+      data: { createdAt },
+    });
+  }
 
   return prisma.post.create({
     data: {
@@ -32,6 +62,7 @@ async function ensurePost(data: {
       threadId: data.threadId,
       authorId: data.authorId,
       parentId: data.parentId ?? null,
+      createdAt,
     },
   });
 }
@@ -53,9 +84,11 @@ async function ensureThread(data: {
   type: "GENERAL" | "TEAM";
   authorId: number;
   openAt: Date;
+  createdAt?: Date;
   teamId?: number | null;
   tagNames: string[];
 }, tagMap: Record<string, { id: number }>) {
+  const createdAt = data.createdAt ?? data.openAt;
   const existing = await prisma.thread.findFirst({
     where: {
       title: data.title,
@@ -64,9 +97,22 @@ async function ensureThread(data: {
     },
   });
 
-  if (existing) return existing;
+  if (existing) {
+    const thread = await prisma.thread.update({
+      where: { id: existing.id },
+      data: {
+        body: data.body,
+        authorId: data.authorId,
+        teamId: data.type === "TEAM" ? data.teamId ?? null : null,
+        openAt: data.openAt,
+        createdAt,
+      },
+    });
+    seededThreadCreatedAt.set(thread.id, createdAt);
+    return thread;
+  }
 
-  return prisma.thread.create({
+  const thread = await prisma.thread.create({
     data: {
       title: data.title,
       body: data.body,
@@ -74,11 +120,37 @@ async function ensureThread(data: {
       authorId: data.authorId,
       teamId: data.type === "TEAM" ? data.teamId ?? null : null,
       openAt: data.openAt,
+      createdAt,
       tags: {
         create: data.tagNames.map((tagName) => ({
           tagId: tagMap[tagName].id,
         })),
       },
+    },
+  });
+  seededThreadCreatedAt.set(thread.id, createdAt);
+  return thread;
+}
+
+async function ensureFollow(data: {
+  followerId: number;
+  followingId: number;
+  createdAt: Date;
+}) {
+  return prisma.follow.upsert({
+    where: {
+      followerId_followingId: {
+        followerId: data.followerId,
+        followingId: data.followingId,
+      },
+    },
+    update: {
+      createdAt: data.createdAt,
+    },
+    create: {
+      followerId: data.followerId,
+      followingId: data.followingId,
+      createdAt: data.createdAt,
     },
   });
 }
@@ -89,10 +161,30 @@ async function main() {
   // ─── Users ───────────────────────────────────────────────────────────────
   const passwordHash = await bcrypt.hash("password123", 10);
   const adminHash = await bcrypt.hash("admin123", 10);
+  const joinedAt = {
+    admin: recentDate(240, 9, 10),
+    system: recentDate(225, 8, 25),
+    harry: recentDate(190, 20, 5),
+    emily: recentDate(176, 18, 40),
+    james: recentDate(164, 21, 15),
+    sara: recentDate(151, 19, 50),
+    mike: recentDate(138, 22, 20),
+    lena: recentDate(126, 17, 35),
+    tom: recentDate(114, 20, 45),
+    aisha: recentDate(102, 18, 5),
+    nina: recentDate(58, 19, 25),
+    omar: recentDate(46, 20, 40),
+    priya: recentDate(34, 18, 15),
+    leo: recentDate(24, 21, 10),
+    maya: recentDate(17, 19, 55),
+    noah: recentDate(9, 20, 30),
+  };
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@sportsdeck.com" },
-    update: {},
+    update: {
+      createdAt: joinedAt.admin,
+    },
     create: {
       email: "admin@sportsdeck.com",
       username: "admin",
@@ -100,6 +192,7 @@ async function main() {
       role: "ADMIN",
       status: "ACTIVE",
       avatar: "/avatars/default1.png",
+      createdAt: joinedAt.admin,
     },
   });
 
@@ -109,6 +202,7 @@ async function main() {
       username: SYSTEM_USER_USERNAME,
       avatar: SYSTEM_USER_AVATAR,
       status: "ACTIVE",
+      createdAt: joinedAt.system,
     },
     create: {
       email: SYSTEM_USER_EMAIL,
@@ -117,13 +211,16 @@ async function main() {
       role: "USER",
       status: "ACTIVE",
       avatar: SYSTEM_USER_AVATAR,
+      createdAt: joinedAt.system,
     },
   });
 
   const users = await Promise.all([
     prisma.user.upsert({
       where: { email: "harry@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.harry,
+      },
       create: {
         email: "harry@sportsdeck.com",
         username: "HarryKane9",
@@ -131,11 +228,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default1.png",
+        createdAt: joinedAt.harry,
       },
     }),
     prisma.user.upsert({
       where: { email: "emily@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.emily,
+      },
       create: {
         email: "emily@sportsdeck.com",
         username: "EmilyFC",
@@ -143,11 +243,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default2.png",
+        createdAt: joinedAt.emily,
       },
     }),
     prisma.user.upsert({
       where: { email: "james@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.james,
+      },
       create: {
         email: "james@sportsdeck.com",
         username: "JamesPL",
@@ -155,11 +258,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default3.png",
+        createdAt: joinedAt.james,
       },
     }),
     prisma.user.upsert({
       where: { email: "sara@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.sara,
+      },
       create: {
         email: "sara@sportsdeck.com",
         username: "SaraGooner",
@@ -167,11 +273,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default1.png",
+        createdAt: joinedAt.sara,
       },
     }),
     prisma.user.upsert({
       where: { email: "mike@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.mike,
+      },
       create: {
         email: "mike@sportsdeck.com",
         username: "MikeRed",
@@ -179,11 +288,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default2.png",
+        createdAt: joinedAt.mike,
       },
     }),
     prisma.user.upsert({
       where: { email: "lena@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.lena,
+      },
       create: {
         email: "lena@sportsdeck.com",
         username: "LenaBlues",
@@ -191,11 +303,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default3.png",
+        createdAt: joinedAt.lena,
       },
     }),
     prisma.user.upsert({
       where: { email: "tom@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.tom,
+      },
       create: {
         email: "tom@sportsdeck.com",
         username: "TomSpurs",
@@ -203,11 +318,14 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default1.png",
+        createdAt: joinedAt.tom,
       },
     }),
     prisma.user.upsert({
       where: { email: "aisha@sportsdeck.com" },
-      update: {},
+      update: {
+        createdAt: joinedAt.aisha,
+      },
       create: {
         email: "aisha@sportsdeck.com",
         username: "AishaCity",
@@ -215,6 +333,97 @@ async function main() {
         role: "USER",
         status: "ACTIVE",
         avatar: "/avatars/default2.png",
+        createdAt: joinedAt.aisha,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "nina@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.nina,
+      },
+      create: {
+        email: "nina@sportsdeck.com",
+        username: "NinaNorthBank",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default3.png",
+        createdAt: joinedAt.nina,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "omar@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.omar,
+      },
+      create: {
+        email: "omar@sportsdeck.com",
+        username: "OmarPress",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default1.png",
+        createdAt: joinedAt.omar,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "priya@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.priya,
+      },
+      create: {
+        email: "priya@sportsdeck.com",
+        username: "PriyaAwayDays",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default2.png",
+        createdAt: joinedAt.priya,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "leo@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.leo,
+      },
+      create: {
+        email: "leo@sportsdeck.com",
+        username: "LeoTempo",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default3.png",
+        createdAt: joinedAt.leo,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "maya@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.maya,
+      },
+      create: {
+        email: "maya@sportsdeck.com",
+        username: "MayaCounter",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default1.png",
+        createdAt: joinedAt.maya,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "noah@sportsdeck.com" },
+      update: {
+        createdAt: joinedAt.noah,
+      },
+      create: {
+        email: "noah@sportsdeck.com",
+        username: "NoahUnderlap",
+        passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        avatar: "/avatars/default2.png",
+        createdAt: joinedAt.noah,
       },
     }),
   ]);
@@ -287,17 +496,54 @@ async function main() {
       .map((team) => [team.name, team])
   );
   console.log(`Resolved ${Object.keys(teamMap).length} synced teams for demo team threads`);
+  const threadTimeline = {
+    seasonDiscussion: recentDate(31, 20, 10),
+    januaryWindow: recentDate(28, 18, 55),
+    titleRace: recentDate(25, 21, 15),
+    relegationBattle: recentDate(23, 19, 5),
+    bestXi: recentDate(21, 20, 35),
+    managerPressure: recentDate(18, 18, 20),
+    topFiveRace: recentDate(16, 21, 45),
+    weekendWatchlist: recentDate(13, 17, 30),
+    youngPlayer: recentDate(11, 20, 0),
+    defensiveStructure: recentDate(9, 19, 20),
+    summerWishList: recentDate(6, 18, 15),
+    underratedSigning: recentDate(5, 21, 10),
+    atmosphere: recentDate(4, 19, 40),
+    congestion: recentDate(4, 21, 25),
+    midTableLeap: recentDate(3, 18, 50),
+    setPiece: recentDate(3, 20, 35),
+    deadlineDay: recentDate(2, 19, 10),
+    changedOpinion: recentDate(2, 21, 5),
+    arsenalCorner: recentDate(3, 19, 5),
+    liverpoolCorner: recentDate(3, 19, 35),
+    chelseaCorner: recentDate(3, 20, 5),
+    spursCorner: recentDate(3, 20, 40),
+    cityCorner: recentDate(3, 21, 10),
+    newcastleCorner: recentDate(3, 21, 35),
+    midfieldTrio: recentDate(1, 18, 45),
+    squadPlayer: recentDate(1, 20, 20),
+    panicMeter: recentDate(14, 20, 15),
+    rewatchMatch: recentDate(12, 19, 35),
+    awayDay: recentDate(10, 21, 5),
+    improvedPlayer: recentDate(8, 18, 50),
+    identity: recentDate(5, 20, 25),
+    finalDayHero: recentDate(2, 18, 40),
+  };
 
   // ─── Threads ─────────────────────────────────────────────────────────────
   const thread1 = await prisma.thread.upsert({
     where: { id: 1 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.seasonDiscussion,
+    },
     create: {
       title: "Premier League 2024/25 Season Discussion",
       body: "Welcome to the general discussion thread for the 2024/25 Premier League season! Share your thoughts, predictions, and reactions here.",
       type: "GENERAL",
       authorId: admin.id,
       openAt: new Date("2024-08-01"),
+      createdAt: threadTimeline.seasonDiscussion,
       tags: {
         create: [
           { tagId: tagMap["premier-league"].id },
@@ -309,13 +555,16 @@ async function main() {
 
   const thread2 = await prisma.thread.upsert({
     where: { id: 2 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.januaryWindow,
+    },
     create: {
       title: "January Transfer Window 2025 - Rumours & Confirmed Deals",
       body: "Keep track of all the latest transfer news, rumours, and confirmed deals from the January 2025 window.",
       type: "GENERAL",
       authorId: users[0].id,
       openAt: new Date("2025-01-01"),
+      createdAt: threadTimeline.januaryWindow,
       tags: {
         create: [{ tagId: tagMap["transfers"].id }],
       },
@@ -324,13 +573,16 @@ async function main() {
 
   const thread3 = await prisma.thread.upsert({
     where: { id: 3 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.titleRace,
+    },
     create: {
       title: "Who will win the title this season?",
       body: "With the season well underway, who do you think will lift the Premier League trophy? Cast your vote and share your reasoning!",
       type: "GENERAL",
       authorId: users[1].id,
       openAt: new Date("2024-09-01"),
+      createdAt: threadTimeline.titleRace,
       tags: {
         create: [
           { tagId: tagMap["top4"].id },
@@ -342,13 +594,16 @@ async function main() {
 
   const thread4 = await prisma.thread.upsert({
     where: { id: 4 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.relegationBattle,
+    },
     create: {
       title: "Relegation Battle 2024/25 — Who Goes Down?",
       body: "The relegation zone is getting tight. Which three teams do you think will drop to the Championship this season?",
       type: "GENERAL",
       authorId: users[2].id,
       openAt: new Date("2024-10-01"),
+      createdAt: threadTimeline.relegationBattle,
       tags: {
         create: [{ tagId: tagMap["relegation"].id }],
       },
@@ -357,13 +612,16 @@ async function main() {
 
   const thread5 = await prisma.thread.upsert({
     where: { id: 5 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.bestXi,
+    },
     create: {
       title: "Best XI of the Season So Far",
       body: "Who would make your Premier League best XI based on performances this season? Drop your team in the comments!",
       type: "GENERAL",
       authorId: users[3].id,
       openAt: new Date("2025-01-15"),
+      createdAt: threadTimeline.bestXi,
       tags: {
         create: [
           { tagId: tagMap["tactics"].id },
@@ -375,13 +633,16 @@ async function main() {
 
   const thread6 = await prisma.thread.upsert({
     where: { id: 6 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.managerPressure,
+    },
     create: {
       title: "Manager Pressure Index: Who's Under the Most Heat?",
       body: "A rough run of fixtures can change the mood around a club fast. Which manager is under the most pressure right now, and who still deserves patience?",
       type: "GENERAL",
       authorId: users[4].id,
       openAt: new Date("2025-02-01"),
+      createdAt: threadTimeline.managerPressure,
       tags: {
         create: [
           { tagId: tagMap["manager"].id },
@@ -393,13 +654,16 @@ async function main() {
 
   const thread7 = await prisma.thread.upsert({
     where: { id: 7 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.topFiveRace,
+    },
     create: {
       title: "Top Five Race: Who Grabs the Final Champions League Spots?",
       body: "With the table tightening up, which clubs do you trust most in the race for the Champions League places? Form, depth, and schedule all matter now.",
       type: "GENERAL",
       authorId: users[6].id,
       openAt: new Date("2025-02-15"),
+      createdAt: threadTimeline.topFiveRace,
       tags: {
         create: [
           { tagId: tagMap["top4"].id },
@@ -411,13 +675,16 @@ async function main() {
 
   const thread8 = await prisma.thread.upsert({
     where: { id: 8 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.weekendWatchlist,
+    },
     create: {
       title: "Weekend Watchlist: Which Fixtures Are You Building Plans Around?",
       body: "Some matchdays are ordinary and some feel loaded from the first kickoff. Which fixtures this weekend are must-watch, and what storylines are you following most closely?",
       type: "GENERAL",
       authorId: users[7].id,
       openAt: new Date("2025-03-01"),
+      createdAt: threadTimeline.weekendWatchlist,
       tags: {
         create: [
           { tagId: tagMap["fixtures"].id },
@@ -429,13 +696,16 @@ async function main() {
 
   const thread9 = await prisma.thread.upsert({
     where: { id: 9 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.youngPlayer,
+    },
     create: {
       title: "Best Young Player in the League Right Now?",
       body: "Forget potential for a second and focus on current level. Which young player is already changing games every week, and who still looks ready for a breakout?",
       type: "GENERAL",
       authorId: users[5].id,
       openAt: new Date("2025-03-10"),
+      createdAt: threadTimeline.youngPlayer,
       tags: {
         create: [
           { tagId: tagMap["youth"].id },
@@ -447,13 +717,16 @@ async function main() {
 
   const thread10 = await prisma.thread.upsert({
     where: { id: 10 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.defensiveStructure,
+    },
     create: {
       title: "Defensive Structure or Low Block Misery? Let's Talk Tactics",
       body: "When does compact defending become a smart tactical plan, and when does it just turn into ninety minutes of surrender? Share the defensive setups you actually enjoy watching.",
       type: "GENERAL",
       authorId: users[2].id,
       openAt: new Date("2025-03-20"),
+      createdAt: threadTimeline.defensiveStructure,
       tags: {
         create: [
           { tagId: tagMap["tactics"].id },
@@ -465,13 +738,16 @@ async function main() {
 
   const thread11 = await prisma.thread.upsert({
     where: { id: 11 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.summerWishList,
+    },
     create: {
       title: "Your Club's Summer Window Wish List",
       body: "If your club could only make three moves this summer, what would they be? Positions, profiles, and realistic targets all count.",
       type: "GENERAL",
       authorId: users[0].id,
       openAt: new Date("2025-04-01"),
+      createdAt: threadTimeline.summerWishList,
       tags: {
         create: [
           { tagId: tagMap["transfers"].id },
@@ -483,13 +759,16 @@ async function main() {
 
   const thread12 = await prisma.thread.upsert({
     where: { id: 12 },
-    update: {},
+    update: {
+      createdAt: threadTimeline.underratedSigning,
+    },
     create: {
       title: "Most Underrated Signing of the Season",
       body: "Not the biggest headline deal, not the flashiest name. Which signing has quietly transformed a side without getting the attention they deserve?",
       type: "GENERAL",
       authorId: users[1].id,
       openAt: new Date("2025-04-10"),
+      createdAt: threadTimeline.underratedSigning,
       tags: {
         create: [
           { tagId: tagMap["underrated"].id },
@@ -507,6 +786,7 @@ async function main() {
         type: "GENERAL",
         authorId: users[6].id,
         openAt: new Date("2025-04-15"),
+        createdAt: threadTimeline.atmosphere,
         tagNames: ["premier-league", "matchday"],
       },
       tagMap
@@ -518,6 +798,7 @@ async function main() {
         type: "GENERAL",
         authorId: users[2].id,
         openAt: new Date("2025-04-18"),
+        createdAt: threadTimeline.congestion,
         tagNames: ["fixtures", "tactics"],
       },
       tagMap
@@ -529,6 +810,7 @@ async function main() {
         type: "GENERAL",
         authorId: users[4].id,
         openAt: new Date("2025-04-21"),
+        createdAt: threadTimeline.midTableLeap,
         tagNames: ["summer-window", "premier-league"],
       },
       tagMap
@@ -540,6 +822,7 @@ async function main() {
         type: "GENERAL",
         authorId: users[5].id,
         openAt: new Date("2025-04-24"),
+        createdAt: threadTimeline.setPiece,
         tagNames: ["tactics", "defence"],
       },
       tagMap
@@ -551,6 +834,7 @@ async function main() {
         type: "GENERAL",
         authorId: users[7].id,
         openAt: new Date("2025-04-27"),
+        createdAt: threadTimeline.deadlineDay,
         tagNames: ["transfers", "summer-window"],
       },
       tagMap
@@ -562,7 +846,104 @@ async function main() {
         type: "GENERAL",
         authorId: users[0].id,
         openAt: new Date("2025-04-30"),
+        createdAt: threadTimeline.changedOpinion,
         tagNames: ["matchday", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Which Midfield Trio Would You Pay to Watch Every Week?",
+        body: "Forget balance for a second and go full entertainment. Which current midfield trio would you happily watch every single weekend, even if they were not your club?",
+        type: "GENERAL",
+        authorId: users[1].id,
+        openAt: new Date("2025-05-02"),
+        createdAt: threadTimeline.midfieldTrio,
+        tagNames: ["tactics", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Best Squad Player in the League?",
+        body: "Not the superstar, not the first name on the team sheet. Who is the best squad player to have around when a season gets messy and depth starts deciding everything?",
+        type: "GENERAL",
+        authorId: users[4].id,
+        openAt: new Date("2025-05-04"),
+        createdAt: threadTimeline.squadPlayer,
+        tagNames: ["underrated", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Run-In Panic Meter: Which Top Team Blinks First?",
+        body: "Every title race has the week where legs go heavy and confidence starts wobbling. Which contender looks most likely to blink first in the run-in, and who still looks ice-cold?",
+        type: "GENERAL",
+        authorId: users[8].id,
+        openAt: new Date("2026-03-15"),
+        createdAt: threadTimeline.panicMeter,
+        tagNames: ["top4", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "One Match From This Month You'd Rewatch Tonight",
+        body: "Not necessarily the best match on paper. Which game from this month had enough chaos, quality, or drama that you would happily watch the whole thing again tonight?",
+        type: "GENERAL",
+        authorId: users[9].id,
+        openAt: new Date("2026-03-17"),
+        createdAt: threadTimeline.rewatchMatch,
+        tagNames: ["matchday", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Best Away End in the League Right Now?",
+        body: "Which travelling support is carrying the most noise this season? Ignore club size for a second and talk about the away end that keeps showing up loud regardless of scoreline.",
+        type: "GENERAL",
+        authorId: users[10].id,
+        openAt: new Date("2026-03-19"),
+        createdAt: threadTimeline.awayDay,
+        tagNames: ["matchday", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Most Improved Player Since January",
+        body: "Who has clearly levelled up since the turn of the year? Could be confidence, role change, fitness, or just a player finally making the league look slow.",
+        type: "GENERAL",
+        authorId: users[11].id,
+        openAt: new Date("2026-03-21"),
+        createdAt: threadTimeline.improvedPlayer,
+        tagNames: ["premier-league", "underrated"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Which Club Has the Clearest Identity Right Now?",
+        body: "Take trophies out of it for a second. Which club can you recognise after five minutes because the pressing, spacing, and decision-making all feel unmistakably theirs?",
+        type: "GENERAL",
+        authorId: users[12].id,
+        openAt: new Date("2026-03-24"),
+        createdAt: threadTimeline.identity,
+        tagNames: ["tactics", "premier-league"],
+      },
+      tagMap
+    ),
+    ensureThread(
+      {
+        title: "Pick Your Last-Day Hero Before the Chaos Starts",
+        body: "Who is your weirdly specific final-day hero pick? Not the obvious superstar, but the player you can already picture scoring or saving the moment when the season gets ridiculous.",
+        type: "GENERAL",
+        authorId: users[13].id,
+        openAt: new Date("2026-03-27"),
+        createdAt: threadTimeline.finalDayHero,
+        tagNames: ["matchday", "top4"],
       },
       tagMap
     ),
@@ -576,6 +957,7 @@ async function main() {
       authorId: users[3].id,
       teamId: teamMap["Arsenal FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.arsenalCorner,
       tagNames: ["transfers", "matchday"],
     },
     teamMap["Liverpool FC"] && {
@@ -585,6 +967,7 @@ async function main() {
       authorId: users[1].id,
       teamId: teamMap["Liverpool FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.liverpoolCorner,
       tagNames: ["tactics", "matchday"],
     },
     teamMap["Chelsea FC"] && {
@@ -594,6 +977,7 @@ async function main() {
       authorId: users[5].id,
       teamId: teamMap["Chelsea FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.chelseaCorner,
       tagNames: ["manager", "transfers"],
     },
     teamMap["Tottenham Hotspur FC"] && {
@@ -603,6 +987,7 @@ async function main() {
       authorId: users[6].id,
       teamId: teamMap["Tottenham Hotspur FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.spursCorner,
       tagNames: ["injury", "tactics"],
     },
     teamMap["Manchester City FC"] && {
@@ -612,6 +997,7 @@ async function main() {
       authorId: users[7].id,
       teamId: teamMap["Manchester City FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.cityCorner,
       tagNames: ["tactics", "top4"],
     },
     teamMap["Newcastle United FC"] && {
@@ -621,6 +1007,7 @@ async function main() {
       authorId: users[4].id,
       teamId: teamMap["Newcastle United FC"].id,
       openAt: new Date("2025-04-14"),
+      createdAt: threadTimeline.newcastleCorner,
       tagNames: ["champions-league", "fixtures"],
     },
   ].filter(Boolean);
@@ -637,12 +1024,39 @@ async function main() {
   const setPieceThread = threadByTitle.get("Who Has the Best Set-Piece Coaching in the League?");
   const deadlineDayThread = threadByTitle.get("Deadline Day Dreams and Disaster Scenarios");
   const changedOpinionThread = threadByTitle.get("Which Match This Season Changed Your Opinion Most?");
+  const midfieldTrioThread = threadByTitle.get("Which Midfield Trio Would You Pay to Watch Every Week?");
+  const squadPlayerThread = threadByTitle.get("Best Squad Player in the League?");
+  const panicMeterThread = threadByTitle.get("Run-In Panic Meter: Which Top Team Blinks First?");
+  const rewatchMatchThread = threadByTitle.get("One Match From This Month You'd Rewatch Tonight");
+  const awayEndThread = threadByTitle.get("Best Away End in the League Right Now?");
+  const improvedPlayerThread = threadByTitle.get("Most Improved Player Since January");
+  const identityThread = threadByTitle.get("Which Club Has the Clearest Identity Right Now?");
+  const finalDayHeroThread = threadByTitle.get("Pick Your Last-Day Hero Before the Chaos Starts");
   const arsenalSupportersThread = threadByTitle.get("Arsenal Supporters Corner");
   const liverpoolSupportersThread = threadByTitle.get("Liverpool Supporters Corner");
   const chelseaSupportersThread = threadByTitle.get("Chelsea Supporters Corner");
   const spursSupportersThread = threadByTitle.get("Spurs Supporters Corner");
   const citySupportersThread = threadByTitle.get("Man City Supporters Corner");
   const newcastleSupportersThread = threadByTitle.get("Newcastle Supporters Corner");
+
+  [
+    thread1,
+    thread2,
+    thread3,
+    thread4,
+    thread5,
+    thread6,
+    thread7,
+    thread8,
+    thread9,
+    thread10,
+    thread11,
+    thread12,
+    ...extraGeneralThreads,
+    ...extraTeamThreads,
+  ].forEach((thread) => {
+    seededThreadCreatedAt.set(thread.id, thread.createdAt);
+  });
 
   console.log(`Ensured ${12 + extraGeneralThreads.length + extraTeamThreads.length} general/team threads`);
 
@@ -958,12 +1372,103 @@ async function main() {
     threadId: changedOpinionThread.id,
     authorId: users[6].id,
   }) : null;
+  const p57 = midfieldTrioThread ? await ensurePost({
+    content: "Rodri, Bernardo, and De Bruyne when they are all in rhythm still feels like football played on fast-forward.",
+    threadId: midfieldTrioThread.id,
+    authorId: users[7].id,
+  }) : null;
+  const p58 = midfieldTrioThread ? await ensurePost({
+    content: "I would pay to watch a midfield that never stops moving off the ball. Arsenal's best combinations get close to that feeling.",
+    threadId: midfieldTrioThread.id,
+    authorId: users[3].id,
+  }) : null;
+  const p59 = squadPlayerThread ? await ensurePost({
+    content: "The best squad players are the ones who never make the structure worse. They just slide in and the team still looks like itself.",
+    threadId: squadPlayerThread.id,
+    authorId: users[2].id,
+  }) : null;
+  const p60 = squadPlayerThread ? await ensurePost({
+    content: "Give me a full-back who can play both sides and never panics in possession. That player saves entire seasons.",
+    threadId: squadPlayerThread.id,
+    authorId: users[5].id,
+  }) : null;
+  const p61 = panicMeterThread ? await ensurePost({
+    content: "Liverpool look the calmest to me. The shape survives bad moments better than most challengers.",
+    threadId: panicMeterThread.id,
+    authorId: users[8].id,
+  }) : null;
+  const p62 = panicMeterThread ? await ensurePost({
+    content: "The panic answer is whichever side suddenly starts protecting one-goal leads in the 60th minute instead of playing their game.",
+    threadId: panicMeterThread.id,
+    authorId: users[9].id,
+  }) : null;
+  const p63 = rewatchMatchThread ? await ensurePost({
+    content: "I would absolutely rewatch the Arsenal-Liverpool chaos from earlier this month. It had tactical adjustments and complete emotional nonsense at the same time.",
+    threadId: rewatchMatchThread.id,
+    authorId: users[10].id,
+  }) : null;
+  const p64 = rewatchMatchThread ? await ensurePost({
+    content: "Give me a late comeback with both benches losing their minds over a tidy 3-0 any day.",
+    threadId: rewatchMatchThread.id,
+    authorId: users[3].id,
+  }) : null;
+  const p65 = awayEndThread ? await ensurePost({
+    content: "Newcastle's away end always sounds like it arrived two hours before kickoff and never sat down once.",
+    threadId: awayEndThread.id,
+    authorId: users[11].id,
+  }) : null;
+  const p66 = awayEndThread ? await ensurePost({
+    content: "Palace and Leeds always get the reputation, but some of the mid-table away followings have been louder all season.",
+    threadId: awayEndThread.id,
+    authorId: users[10].id,
+  }) : null;
+  const p67 = improvedPlayerThread ? await ensurePost({
+    content: "Since January, Gravenberch looks like he finally understands exactly where the game will be one pass early.",
+    threadId: improvedPlayerThread.id,
+    authorId: users[12].id,
+  }) : null;
+  const p68 = improvedPlayerThread ? await ensurePost({
+    content: "I am going with a full-back shout because confidence changes that role more than almost any other on the pitch.",
+    threadId: improvedPlayerThread.id,
+    authorId: users[5].id,
+  }) : null;
+  const p69 = identityThread ? await ensurePost({
+    content: "Bournemouth are one of the clearest identity teams in the league right now. You can tell what they want within two pressing triggers.",
+    threadId: identityThread.id,
+    authorId: users[13].id,
+  }) : null;
+  const p70 = identityThread ? await ensurePost({
+    content: "Arsenal and City are obvious answers, but I respect any club you can recognise from their rest defence alone.",
+    threadId: identityThread.id,
+    authorId: users[2].id,
+  }) : null;
+  const p71 = finalDayHeroThread ? await ensurePost({
+    content: "Give me a centre-back scoring off a horrible near-post flick in stoppage time. Final day drama should always look slightly accidental.",
+    threadId: finalDayHeroThread.id,
+    authorId: users[13].id,
+  }) : null;
+  const p72 = finalDayHeroThread ? await ensurePost({
+    content: "My emergency hero pick is always the squad winger who has done nothing for two months and suddenly turns into a legend for six minutes.",
+    threadId: finalDayHeroThread.id,
+    authorId: users[8].id,
+  }) : null;
+  const p73 = panicMeterThread ? await ensurePost({
+    content: "Title races get decided by who still trusts their rotation on a Wednesday night. That is where the blink usually starts.",
+    threadId: panicMeterThread.id,
+    authorId: users[12].id,
+  }) : null;
+  const p74 = identityThread ? await ensurePost({
+    content: "The best identity teams make even their ugly wins look familiar. That matters more to me than one flashy match.",
+    threadId: identityThread.id,
+    authorId: users[9].id,
+  }) : null;
 
   const posts = [
     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16,
     p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31,
     p32, p33, p34, p35, p36, p37, p38, p39, p40, p41, p42, p43, p44, p45, p46,
-    p47, p48, p49, p50, p51, p52, p53, p54, p55, p56,
+    p47, p48, p49, p50, p51, p52, p53, p54, p55, p56, p57, p58, p59, p60, p61,
+    p62, p63, p64, p65, p66, p67, p68, p69, p70, p71, p72, p73, p74,
   ].filter(Boolean);
 
   console.log(`Ensured ${posts.length} posts`);
@@ -1209,81 +1714,159 @@ async function main() {
     authorId: users[1].id,
     parentId: p56.id,
   }) : null;
+  const r41 = p57 ? await ensurePost({
+    content: "City's midfield always wins this conversation if you let chemistry count as much as talent.",
+    threadId: p57.threadId,
+    authorId: users[1].id,
+    parentId: p57.id,
+  }) : null;
+  const r42 = p58 ? await ensurePost({
+    content: "That is why the watchability answer changes depending on whether you value control or chaos.",
+    threadId: p58.threadId,
+    authorId: users[4].id,
+    parentId: p58.id,
+  }) : null;
+  const r43 = p59 ? await ensurePost({
+    content: "Exactly. A true squad player keeps the shape recognisable, which is way rarer than people admit.",
+    threadId: p59.threadId,
+    authorId: users[0].id,
+    parentId: p59.id,
+  }) : null;
+  const r44 = p60 ? await ensurePost({
+    content: "Versatile full-backs are like cheat codes once fixtures pile up. Every manager wants one and half the league has none.",
+    threadId: p60.threadId,
+    authorId: users[6].id,
+    parentId: p60.id,
+  }) : null;
+  const r45 = p61 ? await ensurePost({
+    content: "That calmness is why I trust them too. They do not start chasing the match structure the second something goes wrong.",
+    threadId: p61.threadId,
+    authorId: users[1].id,
+    parentId: p61.id,
+  }) : null;
+  const r46 = p63 ? await ensurePost({
+    content: "That match had the perfect amount of tactical chess before both teams gave up and embraced chaos.",
+    threadId: p63.threadId,
+    authorId: users[9].id,
+    parentId: p63.id,
+  }) : null;
+  const r47 = p65 ? await ensurePost({
+    content: "Newcastle away support travels like the match is an event, not just another fixture. You can hear it in every close game.",
+    threadId: p65.threadId,
+    authorId: users[4].id,
+    parentId: p65.id,
+  }) : null;
+  const r48 = p67 ? await ensurePost({
+    content: "That is a good shout. He looks half a second quicker mentally, which changes everything in midfield.",
+    threadId: p67.threadId,
+    authorId: users[11].id,
+    parentId: p67.id,
+  }) : null;
+  const r49 = p69 ? await ensurePost({
+    content: "Bournemouth are such a good answer because even their risk-taking looks coached instead of random.",
+    threadId: p69.threadId,
+    authorId: users[12].id,
+    parentId: p69.id,
+  }) : null;
+  const r50 = p71 ? await ensurePost({
+    content: "Final-day goals should always come from the least elegant possible source. Scruffy heroes are mandatory.",
+    threadId: p71.threadId,
+    authorId: users[10].id,
+    parentId: p71.id,
+  }) : null;
+  const r51 = p72 ? await ensurePost({
+    content: "That is the correct pick. There is always one bench winger who becomes folklore for exactly seven touches.",
+    threadId: p72.threadId,
+    authorId: users[3].id,
+    parentId: p72.id,
+  }) : null;
+  const r52 = p74 ? await ensurePost({
+    content: "Exactly. If a team only looks like itself in ideal conditions, I do not really believe in the identity yet.",
+    threadId: p74.threadId,
+    authorId: users[13].id,
+    parentId: p74.id,
+  }) : null;
 
   const replies = [
     r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17,
     r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32,
-    r33, r34, r35, r36, r37, r38, r39, r40,
+    r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47,
+    r48, r49, r50, r51, r52,
   ].filter(Boolean);
 
   console.log(`Ensured ${replies.length} replies`);
 
   // ─── Follows ─────────────────────────────────────────────────────────────
   await Promise.all([
-    prisma.follow.upsert({
-      where: {
-        followerId_followingId: {
-          followerId: users[0].id,
-          followingId: users[1].id,
-        },
-      },
-      update: {},
-      create: {
-        followerId: users[0].id,
-        followingId: users[1].id,
-      },
+    ensureFollow({
+      followerId: users[0].id,
+      followingId: users[1].id,
+      createdAt: recentDate(44, 18, 20),
     }),
-    prisma.follow.upsert({
-      where: {
-        followerId_followingId: {
-          followerId: users[1].id,
-          followingId: users[0].id,
-        },
-      },
-      update: {},
-      create: {
-        followerId: users[1].id,
-        followingId: users[0].id,
-      },
+    ensureFollow({
+      followerId: users[1].id,
+      followingId: users[0].id,
+      createdAt: recentDate(42, 19, 15),
     }),
-    prisma.follow.upsert({
-      where: {
-        followerId_followingId: {
-          followerId: users[2].id,
-          followingId: users[0].id,
-        },
-      },
-      update: {},
-      create: {
-        followerId: users[2].id,
-        followingId: users[0].id,
-      },
+    ensureFollow({
+      followerId: users[2].id,
+      followingId: users[0].id,
+      createdAt: recentDate(37, 20, 5),
     }),
-    prisma.follow.upsert({
-      where: {
-        followerId_followingId: {
-          followerId: users[3].id,
-          followingId: users[1].id,
-        },
-      },
-      update: {},
-      create: {
-        followerId: users[3].id,
-        followingId: users[1].id,
-      },
+    ensureFollow({
+      followerId: users[3].id,
+      followingId: users[1].id,
+      createdAt: recentDate(31, 18, 55),
     }),
-    prisma.follow.upsert({
-      where: {
-        followerId_followingId: {
-          followerId: users[4].id,
-          followingId: users[2].id,
-        },
-      },
-      update: {},
-      create: {
-        followerId: users[4].id,
-        followingId: users[2].id,
-      },
+    ensureFollow({
+      followerId: users[4].id,
+      followingId: users[2].id,
+      createdAt: recentDate(28, 21, 25),
+    }),
+    ensureFollow({
+      followerId: users[5].id,
+      followingId: users[4].id,
+      createdAt: recentDate(21, 19, 35),
+    }),
+    ensureFollow({
+      followerId: users[6].id,
+      followingId: users[3].id,
+      createdAt: recentDate(16, 20, 10),
+    }),
+    ensureFollow({
+      followerId: users[7].id,
+      followingId: users[1].id,
+      createdAt: recentDate(12, 18, 45),
+    }),
+    ensureFollow({
+      followerId: users[8].id,
+      followingId: users[3].id,
+      createdAt: recentDate(10, 19, 20),
+    }),
+    ensureFollow({
+      followerId: users[9].id,
+      followingId: users[8].id,
+      createdAt: recentDate(8, 20, 35),
+    }),
+    ensureFollow({
+      followerId: users[10].id,
+      followingId: users[4].id,
+      createdAt: recentDate(7, 18, 55),
+    }),
+    ensureFollow({
+      followerId: users[11].id,
+      followingId: users[9].id,
+      createdAt: recentDate(5, 21, 15),
+    }),
+    ensureFollow({
+      followerId: users[12].id,
+      followingId: users[1].id,
+      createdAt: recentDate(3, 19, 45),
+    }),
+    ensureFollow({
+      followerId: users[13].id,
+      followingId: users[12].id,
+      createdAt: recentDate(1, 20, 5),
     }),
   ]);
 

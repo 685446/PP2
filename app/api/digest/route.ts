@@ -587,6 +587,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If a stale digest exists, serve it instead of surfacing a cooldown message.
+    const stalePayload = await getStaleSharedDigestPayload();
+    if (stalePayload) {
+      return NextResponse.json(
+        {
+          ...stalePayload,
+          digestMeta: {
+            ...stalePayload.digestMeta,
+            servedStale: true,
+          },
+        },
+        {
+          headers: {
+            "X-Digest-Cache": "stale",
+            "Cache-Control": "private, no-store",
+          },
+        }
+      );
+    }
+
     // Only enforce abuse protection when a new regeneration is needed.
     const abuseError = enforceDigestAbuseProtection(request, requesterUserId);
     if (abuseError) return abuseError;

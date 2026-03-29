@@ -72,10 +72,13 @@ type ApiFeedItem = {
     | "FOLLOWED_USER_THREAD"
     | "FOLLOWED_USER_POST"
     | "REPLY_TO_MY_POST"
+    | "REPLIES_TO_MY_POST_GROUP"
     | "POST_IN_MY_THREAD"
+    | "POSTS_IN_MY_THREAD_GROUP"
     | "NEW_FOLLOWER"
     | "FAVORITE_TEAM_MATCH_SCORE"
     | "FAVORITE_TEAM_THREAD"
+    | "FAVORITE_TEAM_THREAD_GROUP"
     | "FAVORITE_TEAM_MATCH_THREAD";
   createdAt: string;
   actor: FeedActor | null;
@@ -151,8 +154,23 @@ function mapItemType(type: ApiFeedItem["type"]): HomeFeedItem["type"] {
   if (type === "FOLLOWED_USER_THREAD" || type === "FOLLOWED_USER_POST" || type === "NEW_FOLLOWER") {
     return "following";
   }
-  if (type === "REPLY_TO_MY_POST" || type === "POST_IN_MY_THREAD") return "reply";
+  if (
+    type === "REPLY_TO_MY_POST" ||
+    type === "REPLIES_TO_MY_POST_GROUP" ||
+    type === "POST_IN_MY_THREAD" ||
+    type === "POSTS_IN_MY_THREAD_GROUP"
+  ) {
+    return "reply";
+  }
   return "team-update";
+}
+
+function isGroupedEvent(type: ApiFeedItem["type"]) {
+  return (
+    type === "REPLIES_TO_MY_POST_GROUP" ||
+    type === "POSTS_IN_MY_THREAD_GROUP" ||
+    type === "FAVORITE_TEAM_THREAD_GROUP"
+  );
 }
 
 function buildTitle(item: ApiFeedItem): string {
@@ -175,6 +193,11 @@ function buildTitle(item: ApiFeedItem): string {
     return `${author} replied to your post`;
   }
 
+  if (item.type === "REPLIES_TO_MY_POST_GROUP" && item.entity.kind === "post") {
+    const count = item.entity.directReplyCount ?? 0;
+    return count === 1 ? "New reply on your comment" : `${count} new replies on your comment`;
+  }
+
   if (item.type === "POST_IN_MY_THREAD") {
     const author = item.actor?.username ?? "A user";
     if (item.entity.kind === "post" && item.entity.threadTitle) {
@@ -183,8 +206,20 @@ function buildTitle(item: ApiFeedItem): string {
     return `${author} posted in your discussion`;
   }
 
+  if (item.type === "POSTS_IN_MY_THREAD_GROUP" && item.entity.kind === "thread") {
+    const count = item.entity.directPostCount ?? 0;
+    return count === 1 ? "New post in your thread" : `${count} new posts in your thread`;
+  }
+
   if (item.type === "FAVORITE_TEAM_THREAD") {
     return "New thread in your favorite team forum";
+  }
+
+  if (item.type === "FAVORITE_TEAM_THREAD_GROUP" && item.entity.kind === "thread") {
+    const count = item.entity.directPostCount ?? 0;
+    return count === 1
+      ? "New thread in your favorite team forum"
+      : `${count} new threads in your favorite team forum`;
   }
 
   if (item.type === "NEW_FOLLOWER") {
@@ -234,10 +269,19 @@ function buildContext(item: ApiFeedItem): string {
   }
 
   if (item.entity.kind === "thread" && item.entity.title) {
+    if (item.type === "POSTS_IN_MY_THREAD_GROUP") {
+      return `Your thread: ${item.entity.title}`;
+    }
+    if (item.type === "FAVORITE_TEAM_THREAD_GROUP") {
+      return item.entity.teamName ? `${item.entity.teamName} community` : "Favorite team community";
+    }
     return item.entity.title;
   }
 
   if (item.entity.kind === "post" && item.entity.threadTitle) {
+    if (item.type === "REPLIES_TO_MY_POST_GROUP") {
+      return `Posted in: ${item.entity.threadTitle}`;
+    }
     return item.entity.threadTitle;
   }
 
@@ -325,23 +369,23 @@ function buildMatchInfo(item: ApiFeedItem): HomeFeedItem["matchInfo"] | undefine
 function toHomeFeedItem(item: ApiFeedItem): HomeFeedItem {
   const createdAtMs = Date.parse(item.createdAt);
   const contextCrestUrl =
-    item.type === "FOLLOWED_USER_THREAD" && item.entity.kind === "thread" && item.entity.threadType === "TEAM"
+    item.entity.kind === "thread" && item.entity.threadType === "TEAM"
       ? item.entity.teamCrestUrl ?? null
-      : item.type === "FOLLOWED_USER_POST" && item.entity.kind === "post" && item.entity.threadType === "TEAM"
-      ? item.entity.threadTeamCrestUrl ?? null
-      : null;
+      : item.entity.kind === "post" && item.entity.threadType === "TEAM"
+        ? item.entity.threadTeamCrestUrl ?? null
+        : null;
   const contextCrestAlt =
-    item.type === "FOLLOWED_USER_THREAD" && item.entity.kind === "thread" && item.entity.threadType === "TEAM"
+    item.entity.kind === "thread" && item.entity.threadType === "TEAM"
       ? item.entity.teamName
         ? `${item.entity.teamName} crest`
         : "Team crest"
-      : item.type === "FOLLOWED_USER_POST" && item.entity.kind === "post" && item.entity.threadType === "TEAM"
-      ? item.entity.threadTeamName
-        ? `${item.entity.threadTeamName} crest`
-        : "Team crest"
-      : null;
+      : item.entity.kind === "post" && item.entity.threadType === "TEAM"
+        ? item.entity.threadTeamName
+          ? `${item.entity.threadTeamName} crest`
+          : "Team crest"
+        : null;
   const postRelation =
-    item.entity.kind === "post"
+    item.entity.kind === "post" && !isGroupedEvent(item.type)
       ? item.entity.parentId != null && item.entity.parentAuthorUsername
         ? {
             kind: "replying-to" as const,
@@ -370,6 +414,7 @@ function toHomeFeedItem(item: ApiFeedItem): HomeFeedItem {
   return {
     id: item.id,
     type: mapItemType(item.type),
+    isGrouped: isGroupedEvent(item.type),
     originKind: item.entity?.kind ?? "other",
     title: buildTitle(item),
     summary: item.summary,

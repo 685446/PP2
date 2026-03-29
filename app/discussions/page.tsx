@@ -9,17 +9,21 @@ import {
 } from "@/components/auth/session";
 import { SYSTEM_USER_BADGE, SYSTEM_USER_BIO, isSystemUsername } from "@/lib/systemUser";
 import {
+  ChevronDown,
   Lock,
   MessageSquare,
   PencilLine,
   RefreshCcw,
   Search,
   ShieldAlert,
+  SlidersHorizontal,
   Sparkles,
   Tag,
   Users,
 } from "lucide-react";
 import {
+  Dispatch,
+  SetStateAction,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -307,6 +311,388 @@ async function fetchTeams() {
 
   const payload = (await response.json()) as { data?: TeamOption[] };
   return Array.isArray(payload.data) ? payload.data : [];
+}
+
+function DiscussionsComposerPanel({
+  session,
+  loginHref,
+  communityScopedCompose,
+  scopedTeamLabel,
+  composer,
+  setComposer,
+  composerPending,
+  composerError,
+  teams,
+  teamsLoading,
+  teamsError,
+  submitThread,
+}: {
+  session: StoredAuthSession | null;
+  loginHref: string;
+  communityScopedCompose: boolean;
+  scopedTeamLabel: string;
+  composer: ThreadComposer;
+  setComposer: Dispatch<SetStateAction<ThreadComposer>>;
+  composerPending: boolean;
+  composerError: string | null;
+  teams: TeamOption[];
+  teamsLoading: boolean;
+  teamsError: string | null;
+  submitThread: () => Promise<void>;
+}) {
+  return (
+    <div className="rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+      <div className="flex items-start gap-3">
+        <div className="rounded-2xl bg-sky-500/10 p-2 text-sky-600">
+          <PencilLine className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-[color:var(--foreground)]">Start a Thread</h2>
+          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+            {communityScopedCompose
+              ? "You are creating a thread directly inside this team community."
+              : "Create a general discussion or open a team-specific thread from here."}
+          </p>
+        </div>
+      </div>
+
+      {!session ? (
+        <div className="mt-4 space-y-3">
+          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4 text-sm text-[color:var(--foreground)]">
+            Sign in to start your own threads.
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href={loginHref} className="btn-primary">
+              Sign In
+            </Link>
+            <Link href="/register" className="btn-secondary">
+              Create Account
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {communityScopedCompose && (
+            <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-sm font-semibold text-[color:var(--foreground)]">
+              Team thread for {scopedTeamLabel}
+            </div>
+          )}
+
+          <ThreadComposerForm
+            draft={composer}
+            onChange={(next) => setComposer(next)}
+            onSubmit={() => void submitThread()}
+            disabled={composerPending}
+            errorMessage={composerError}
+            showTypeToggle={!communityScopedCompose}
+            threadType={composer.type}
+            onThreadTypeChange={(type) =>
+              setComposer((current) => ({
+                ...current,
+                type,
+              }))
+            }
+            showTeamField={communityScopedCompose || composer.type === "TEAM"}
+            teamFieldMode={communityScopedCompose ? "locked" : "select"}
+            teamLabel="Team"
+            teamId={composer.teamId}
+            onTeamIdChange={(value) =>
+              setComposer((current) => ({
+                ...current,
+                teamId: value,
+              }))
+            }
+            lockedTeamLabel={scopedTeamLabel}
+            teams={teams.map((team) => ({
+              id: team.id,
+              name: team.name,
+            }))}
+            teamsLoading={teamsLoading}
+            teamsError={teamsError}
+            teamSelectPlaceholder="Choose a team"
+            tagsPlaceholder="transfers, tactics, matchday"
+            bodyRows={5}
+            footerRightText="Up to 5 tags"
+            submitLabel="Create Thread"
+            pendingLabel="Publishing..."
+            showCancel={false}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscussionsFiltersPanel({
+  appliedFilters,
+  currentPage,
+  draftFilters,
+  hasActiveFilters,
+  loadThreads,
+  refreshing,
+  resetFilters,
+  session,
+  setDraftFilters,
+  submitFilters,
+}: {
+  appliedFilters: AppliedFilters;
+  currentPage: number;
+  draftFilters: FilterDraft;
+  hasActiveFilters: boolean;
+  loadThreads: (filters: AppliedFilters, page: number, options?: { background?: boolean }) => Promise<void>;
+  refreshing: boolean;
+  resetFilters: () => void;
+  session: StoredAuthSession | null;
+  setDraftFilters: Dispatch<SetStateAction<FilterDraft>>;
+  submitFilters: () => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[color:var(--foreground)]">Thread Filters</h2>
+          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">Refine the feed using the real backend query params.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadThreads(appliedFilters, currentPage, { background: true })}
+          className="btn-icon"
+          aria-label="Refresh discussions"
+        >
+          <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
+          Quick Views
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+              !hasActiveFilters
+                ? "border-sky-500 bg-sky-500/10 text-sky-600"
+                : "border-[color:var(--surface-border)] bg-[color:var(--surface)] text-[color:var(--foreground)] hover:border-sky-500/35"
+            }`}
+          >
+            All Discussions
+          </button>
+          {session ? (
+            <Link
+              href="/discussions/my-content"
+              className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-3 text-left text-sm font-semibold text-[color:var(--foreground)] transition hover:border-sky-500/35"
+            >
+              My Content
+              <span className="mt-1 block text-xs font-medium text-[color:var(--muted-foreground)]">
+                View your threads, posts, replies, and polls
+              </span>
+            </Link>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[color:var(--surface-border)] px-3 py-3 text-sm text-[color:var(--muted-foreground)]">
+              Sign in to use the My Content shortcut.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-3">
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Title</span>
+          <input
+            value={draftFilters.title}
+            onChange={(event) =>
+              setDraftFilters((current) => ({ ...current, title: event.target.value }))
+            }
+            placeholder="Transfer rumours, title race, match thread..."
+            className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
+          />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Author</span>
+          <input
+            value={draftFilters.author}
+            onChange={(event) =>
+              setDraftFilters((current) => ({ ...current, author: event.target.value }))
+            }
+            placeholder="Username"
+            className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
+          />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Team</span>
+          <input
+            value={draftFilters.team}
+            onChange={(event) =>
+              setDraftFilters((current) => ({ ...current, team: event.target.value }))
+            }
+            placeholder="Arsenal, Liverpool, Chelsea..."
+            className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
+          />
+        </label>
+
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Tags</span>
+          <input
+            value={draftFilters.tags}
+            onChange={(event) =>
+              setDraftFilters((current) => ({ ...current, tags: event.target.value }))
+            }
+            placeholder="matchday, tactics, transfers"
+            className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
+          />
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Thread Type</p>
+        <div className="grid grid-cols-2 gap-2">
+          {TYPE_OPTIONS.map((option) => {
+            const active = draftFilters.type === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() =>
+                  setDraftFilters((current) => ({
+                    ...current,
+                    type: option,
+                  }))
+                }
+                className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
+                  active
+                    ? "border-sky-500 bg-sky-500/10 text-sky-600"
+                    : "border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] text-[color:var(--muted-foreground)] hover:text-[color:var(--foreground)]"
+                }`}
+              >
+                {option === "ALL" ? "All Threads" : option}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button type="button" onClick={submitFilters} className="btn-primary">
+          <Search className="h-4 w-4" />
+          Apply Filters
+        </button>
+        <button type="button" onClick={resetFilters} className="btn-secondary">
+          Clear
+        </button>
+      </div>
+    </>
+  );
+}
+
+function DiscussionPreviewContent({ selectedThread }: { selectedThread: ThreadRecord | null }) {
+  if (!selectedThread) {
+    return (
+      <EmptyStateCard
+        title="Select a thread to preview it here."
+        className="flex h-full min-h-[320px] items-center justify-center rounded-2xl bg-[color:var(--surface-elevated)] p-6 shadow-none"
+        titleClassName="text-base font-normal text-[color:var(--muted-foreground)]"
+        descriptionClassName="hidden"
+        dashed
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+          Active Preview
+        </span>
+        <span className="text-xs text-[color:var(--muted-foreground)]">Thread #{selectedThread.id}</span>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-2xl font-bold text-[color:var(--foreground)]">{selectedThread.title}</h2>
+        <p className="whitespace-pre-wrap text-sm leading-7 text-[color:var(--muted-foreground)]">
+          {selectedThread.body}
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+        <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Author</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold text-[color:var(--foreground)]">{selectedThread.author.username}</p>
+            {isSystemThreadAuthor(selectedThread) && (
+              <span className="inline-flex items-center rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
+                {SYSTEM_USER_BADGE}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+            Opened {formatDateTime(selectedThread.openAt) ?? formatRelativeDate(selectedThread.openAt)}
+          </p>
+          {isSystemThreadAuthor(selectedThread) && (
+            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{SYSTEM_USER_BIO}</p>
+          )}
+        </div>
+        <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+          <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Thread Stats</p>
+          <p className="mt-2 text-base font-semibold text-[color:var(--foreground)]">{selectedThread._count.posts} visible posts</p>
+          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+            {selectedThread.team ? selectedThread.team.name : "League-wide discussion"}
+          </p>
+        </div>
+      </div>
+
+      {selectedThread.type === "MATCH" && (
+        <div
+          className={`rounded-2xl border p-4 text-sm ${
+            isClosedMatchThread(selectedThread)
+              ? "border-amber-500/25 bg-amber-400/10 text-[color:var(--foreground)]"
+              : "border-emerald-500/25 bg-emerald-400/10 text-[color:var(--foreground)]"
+          }`}
+        >
+          <p className="font-semibold">
+            {isClosedMatchThread(selectedThread)
+              ? "This match thread is closed."
+              : "This match thread is live."}
+          </p>
+          <p className="mt-2">
+            Opened {formatDateTime(selectedThread.openAt) ?? "unknown"}.
+            {selectedThread.closedAt
+              ? ` ${isClosedMatchThread(selectedThread) ? "Closed" : "Closes"} ${formatDateTime(selectedThread.closedAt) ?? "unknown"}.`
+              : ""}
+          </p>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
+        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Tag Cluster</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {selectedThread.tags.length > 0 ? (
+            selectedThread.tags.map(({ tag: threadTag }) => (
+              <span
+                key={threadTag.id}
+                className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)]"
+              >
+                {threadTag.name}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm text-[color:var(--muted-foreground)]">No tags attached</span>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm text-[color:var(--foreground)]">
+        Use Preview for a quick scan, or open the full thread to read posts and replies.
+      </div>
+
+      <Link href={buildThreadHref(selectedThread.id, { source: "discussions" })} className="btn-primary w-full justify-center">
+        Open Full Thread
+      </Link>
+    </div>
+  );
 }
 
 export default function DiscussionsPage() {
@@ -747,232 +1133,107 @@ export default function DiscussionsPage() {
         </div>
       </div>
 
+      <div className="space-y-4 xl:hidden">
+        <details className="overflow-hidden rounded-[22px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_12px_36px_rgba(2,8,23,0.08)]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--foreground)]">
+              <PencilLine className="h-4 w-4 text-sky-600" />
+              Start a Thread
+            </span>
+            <ChevronDown className="h-4 w-4 text-[color:var(--muted-foreground)]" />
+          </summary>
+          <div ref={composerSectionRef} className="border-t border-[color:var(--surface-border)] p-4">
+            <DiscussionsComposerPanel
+              session={session}
+              loginHref={loginHref}
+              communityScopedCompose={communityScopedCompose}
+              scopedTeamLabel={scopedTeamLabel}
+              composer={composer}
+              setComposer={setComposer}
+              composerPending={composerPending}
+              composerError={composerError}
+              teams={teams}
+              teamsLoading={teamsLoading}
+              teamsError={teamsError}
+              submitThread={submitThread}
+            />
+          </div>
+        </details>
+
+        <details className="overflow-hidden rounded-[22px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_12px_36px_rgba(2,8,23,0.08)]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--foreground)]">
+              <SlidersHorizontal className="h-4 w-4 text-sky-600" />
+              Filters and Views
+            </span>
+            <ChevronDown className="h-4 w-4 text-[color:var(--muted-foreground)]" />
+          </summary>
+          <div className="space-y-5 border-t border-[color:var(--surface-border)] p-4">
+            <DiscussionsFiltersPanel
+              appliedFilters={appliedFilters}
+              currentPage={currentPage}
+              draftFilters={draftFilters}
+              hasActiveFilters={hasActiveFilters}
+              loadThreads={loadThreads}
+              refreshing={refreshing}
+              resetFilters={resetFilters}
+              session={session}
+              setDraftFilters={setDraftFilters}
+              submitFilters={submitFilters}
+            />
+          </div>
+        </details>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)] xl:items-start">
-        <aside className="self-start space-y-5 rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_12px_40px_rgba(2,8,23,0.08)] backdrop-blur xl:sticky xl:top-24">
-          <div
-            ref={composerSectionRef}
-            className="rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-sky-500/10 p-2 text-sky-600">
-                <PencilLine className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-[color:var(--foreground)]">Start a Thread</h2>
-                <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                  {communityScopedCompose
-                    ? "You are creating a thread directly inside this team community."
-                    : "Create a general discussion or open a team-specific thread from here."}
-                </p>
-              </div>
-            </div>
-
-            {!session ? (
-              <div className="mt-4 space-y-3">
-                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4 text-sm text-[color:var(--foreground)]">
-                  Sign in to start your own threads.
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Link href={loginHref} className="btn-primary">
-                    Sign In
-                  </Link>
-                  <Link href="/register" className="btn-secondary">
-                    Create Account
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-4">
-                {communityScopedCompose && (
-                  <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-sm font-semibold text-[color:var(--foreground)]">
-                    Team thread for {scopedTeamLabel}
-                  </div>
-                )}
-
-                <ThreadComposerForm
-                  draft={composer}
-                  onChange={(next) => setComposer(next)}
-                  onSubmit={() => void submitThread()}
-                  disabled={composerPending}
-                  errorMessage={composerError}
-                  showTypeToggle={!communityScopedCompose}
-                  threadType={composer.type}
-                  onThreadTypeChange={(type) =>
-                    setComposer((current) => ({
-                      ...current,
-                      type,
-                    }))
-                  }
-                  showTeamField={communityScopedCompose || composer.type === "TEAM"}
-                  teamFieldMode={communityScopedCompose ? "locked" : "select"}
-                  teamLabel="Team"
-                  teamId={composer.teamId}
-                  onTeamIdChange={(value) =>
-                    setComposer((current) => ({
-                      ...current,
-                      teamId: value,
-                    }))
-                  }
-                  lockedTeamLabel={scopedTeamLabel}
-                  teams={teams.map((team) => ({
-                    id: team.id,
-                    name: team.name,
-                  }))}
-                  teamsLoading={teamsLoading}
-                  teamsError={teamsError}
-                  teamSelectPlaceholder="Choose a team"
-                  tagsPlaceholder="transfers, tactics, matchday"
-                  bodyRows={5}
-                  footerRightText="Up to 5 tags"
-                  submitLabel="Create Thread"
-                  pendingLabel="Publishing..."
-                  showCancel={false}
-                />
-              </div>
-            )}
+        <aside className="hidden self-start space-y-5 rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_12px_40px_rgba(2,8,23,0.08)] backdrop-blur xl:sticky xl:top-24 xl:block">
+          <div ref={composerSectionRef}>
+            <DiscussionsComposerPanel
+              session={session}
+              loginHref={loginHref}
+              communityScopedCompose={communityScopedCompose}
+              scopedTeamLabel={scopedTeamLabel}
+              composer={composer}
+              setComposer={setComposer}
+              composerPending={composerPending}
+              composerError={composerError}
+              teams={teams}
+              teamsLoading={teamsLoading}
+              teamsError={teamsError}
+              submitThread={submitThread}
+            />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-[color:var(--foreground)]">Thread Filters</h2>
-              <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">Refine the feed using the real backend query params.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => loadThreads(appliedFilters, currentPage, { background: true })}
-              className="btn-icon"
-              aria-label="Refresh discussions"
-            >
-              <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-              Quick Views
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <button
-                type="button"
-                onClick={resetFilters}
-                className={`rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  !hasActiveFilters
-                    ? "border-sky-500 bg-sky-500/10 text-sky-600"
-                    : "border-[color:var(--surface-border)] bg-[color:var(--surface)] text-[color:var(--foreground)] hover:border-sky-500/35"
-                }`}
-              >
-                All Discussions
-              </button>
-              {session ? (
-                <Link
-                  href="/discussions/my-content"
-                  className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-3 text-left text-sm font-semibold text-[color:var(--foreground)] transition hover:border-sky-500/35"
-                >
-                  My Content
-                  <span className="mt-1 block text-xs font-medium text-[color:var(--muted-foreground)]">
-                    View your threads, posts, replies, and polls
-                  </span>
-                </Link>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[color:var(--surface-border)] px-3 py-3 text-sm text-[color:var(--muted-foreground)]">
-                  Sign in to use the My Content shortcut.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Title</span>
-              <input
-                value={draftFilters.title}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, title: event.target.value }))
-                }
-                placeholder="Transfer rumours, title race, match thread..."
-                className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Author</span>
-              <input
-                value={draftFilters.author}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, author: event.target.value }))
-                }
-                placeholder="Username"
-                className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Team</span>
-              <input
-                value={draftFilters.team}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, team: event.target.value }))
-                }
-                placeholder="Arsenal, Liverpool, Chelsea..."
-                className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Tags</span>
-              <input
-                value={draftFilters.tags}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, tags: event.target.value }))
-                }
-                placeholder="matchday, tactics, transfers"
-                className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-foreground)] focus:border-sky-500"
-              />
-            </label>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Thread Type</p>
-            <div className="grid grid-cols-2 gap-2">
-              {TYPE_OPTIONS.map((option) => {
-                const active = draftFilters.type === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() =>
-                      setDraftFilters((current) => ({
-                        ...current,
-                        type: option,
-                      }))
-                    }
-                    className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
-                      active
-                        ? "border-sky-500 bg-sky-500/10 text-sky-600"
-                        : "border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] text-[color:var(--muted-foreground)] hover:text-[color:var(--foreground)]"
-                    }`}
-                  >
-                    {option === "ALL" ? "All Threads" : option}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={submitFilters} className="btn-primary">
-              <Search className="h-4 w-4" />
-              Apply Filters
-            </button>
-            <button type="button" onClick={resetFilters} className="btn-secondary">
-              Clear
-            </button>
-          </div>
-
+          <DiscussionsFiltersPanel
+            appliedFilters={appliedFilters}
+            currentPage={currentPage}
+            draftFilters={draftFilters}
+            hasActiveFilters={hasActiveFilters}
+            loadThreads={loadThreads}
+            refreshing={refreshing}
+            resetFilters={resetFilters}
+            session={session}
+            setDraftFilters={setDraftFilters}
+            submitFilters={submitFilters}
+          />
         </aside>
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px] 2xl:items-start">
           <div className="space-y-4">
+            <div ref={previewPanelRef} className="2xl:hidden">
+              <div className="rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_12px_36px_rgba(2,8,23,0.08)]">
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    Quick Preview
+                  </span>
+                  <span className="text-xs text-[color:var(--muted-foreground)]">
+                    Tap Preview on a card to inspect it without leaving the page.
+                  </span>
+                </div>
+                <DiscussionPreviewContent selectedThread={selectedThread} />
+              </div>
+            </div>
+
             {hasActiveFilters && (
               <div className="rounded-[24px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1151,7 +1412,7 @@ export default function DiscussionsPage() {
                   <span className="font-semibold text-[color:var(--foreground)]">{total}</span> threads
                 </p>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <button
                     type="button"
                     onClick={goToPreviousPage}
@@ -1170,7 +1431,7 @@ export default function DiscussionsPage() {
                   <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-2 text-sm font-semibold whitespace-nowrap text-[color:var(--foreground)]">
                     Page {currentPage} of {Math.max(totalPages, 1)}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <input
                       type="number"
                       min={1}
@@ -1182,7 +1443,7 @@ export default function DiscussionsPage() {
                           submitPageJump();
                         }
                       }}
-                      className="w-20 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2 text-center text-sm font-semibold text-[color:var(--foreground)] outline-none transition focus:border-sky-500"
+                      className="w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2 text-center text-sm font-semibold text-[color:var(--foreground)] outline-none transition focus:border-sky-500 sm:w-20"
                       aria-label="Page number"
                     />
                     <button
@@ -1221,114 +1482,8 @@ export default function DiscussionsPage() {
             )}
           </div>
 
-          <aside
-            ref={previewPanelRef}
-            className="self-start rounded-[26px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_16px_48px_rgba(2,8,23,0.08)] 2xl:sticky 2xl:top-24"
-          >
-            {selectedThread ? (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
-                    Active Preview
-                  </span>
-                  <span className="text-xs text-[color:var(--muted-foreground)]">Thread #{selectedThread.id}</span>
-                </div>
-
-                <div className="space-y-3">
-                  <h2 className="text-2xl font-bold text-[color:var(--foreground)]">{selectedThread.title}</h2>
-                  <p
-                    className={`whitespace-pre-wrap text-sm leading-7 ${
-                      isClosedMatchThread(selectedThread) ? "text-[color:var(--muted-foreground)]" : "text-[color:var(--muted-foreground)]"
-                    }`}
-                  >
-                    {selectedThread.body}
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                  <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Author</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-[color:var(--foreground)]">{selectedThread.author.username}</p>
-                      {isSystemThreadAuthor(selectedThread) && (
-                        <span className="inline-flex items-center rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">
-                          {SYSTEM_USER_BADGE}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                      Opened {formatDateTime(selectedThread.openAt) ?? formatRelativeDate(selectedThread.openAt)}
-                    </p>
-                    {isSystemThreadAuthor(selectedThread) && (
-                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{SYSTEM_USER_BIO}</p>
-                    )}
-                  </div>
-                  <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Thread Stats</p>
-                    <p className="mt-2 text-base font-semibold text-[color:var(--foreground)]">{selectedThread._count.posts} visible posts</p>
-                    <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                      {selectedThread.team ? selectedThread.team.name : "League-wide discussion"}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedThread.type === "MATCH" && (
-                  <div
-                    className={`rounded-2xl border p-4 text-sm ${
-                      isClosedMatchThread(selectedThread)
-                        ? "border-amber-500/25 bg-amber-400/10 text-[color:var(--foreground)]"
-                        : "border-emerald-500/25 bg-emerald-400/10 text-[color:var(--foreground)]"
-                    }`}
-                  >
-                    <p className="font-semibold">
-                      {isClosedMatchThread(selectedThread)
-                        ? "This match thread is closed."
-                        : "This match thread is live."}
-                    </p>
-                    <p className="mt-2">
-                      Opened {formatDateTime(selectedThread.openAt) ?? "unknown"}.
-                      {selectedThread.closedAt
-                        ? ` ${isClosedMatchThread(selectedThread) ? "Closed" : "Closes"} ${formatDateTime(selectedThread.closedAt) ?? "unknown"}.`
-                        : ""}
-                    </p>
-                  </div>
-                )}
-
-                <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Tag Cluster</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedThread.tags.length > 0 ? (
-                      selectedThread.tags.map(({ tag: threadTag }) => (
-                        <span
-                          key={threadTag.id}
-                          className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)]"
-                        >
-                          {threadTag.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-[color:var(--muted-foreground)]">No tags attached</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm text-[color:var(--foreground)]">
-                  Use Preview for a quick scan, or open the full thread to read posts and replies.
-                </div>
-
-                <Link href={buildThreadHref(selectedThread.id, { source: "discussions" })} className="btn-primary w-full justify-center">
-                  Open Full Thread
-                </Link>
-              </div>
-            ) : (
-              <EmptyStateCard
-                title="Select a thread to preview it here."
-                className="flex h-full min-h-[320px] items-center justify-center rounded-2xl bg-[color:var(--surface-elevated)] p-6 shadow-none"
-                titleClassName="text-base font-normal text-[color:var(--muted-foreground)]"
-                descriptionClassName="hidden"
-                dashed
-              />
-            )}
+          <aside className="hidden self-start rounded-[26px] border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_16px_48px_rgba(2,8,23,0.08)] 2xl:sticky 2xl:top-24 2xl:block">
+            <DiscussionPreviewContent selectedThread={selectedThread} />
           </aside>
         </div>
       </div>

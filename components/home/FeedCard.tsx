@@ -88,15 +88,23 @@ function GenericFeedCard({ item }: FeedCardProps) {
       href={item.href}
       ariaLabel={`${item.title}. ${item.summary}`}
       headerLeft={
-        <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-xs font-semibold text-sky-500">
-          <FeedTypeIcon type={item.type} />
-          <FeedTypeLabel type={item.type} />
+        <div className="inline-flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-xs font-semibold text-sky-500">
+            <FeedTypeIcon type={item.type} />
+            <FeedTypeLabel type={item.type} />
+          </div>
+          {item.isGrouped ? (
+            <div className="inline-flex items-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-foreground)]">
+              Grouped
+            </div>
+          ) : null}
         </div>
       }
       timeLabel={item.timestampLabel}
       relation={<PostRelationLine item={item} />}
       title={item.title}
       summary={item.summary}
+      summaryClassName={item.isGrouped ? "text-[color:var(--foreground)]/88" : undefined}
       footerLeft={
         <span className="inline-flex min-w-0 items-center gap-2">
           {item.contextCrestUrl ? (

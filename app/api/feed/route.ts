@@ -5,7 +5,7 @@ import { authenticate } from "@/lib/middleware";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 14;
 const SOURCE_LIMIT = 200;
-const RECENT_MATCH_THREAD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const TEAM_THREAD_GROUP_WINDOW_MS = 45 * 60 * 1000;
 
 type SearchParamsLike = Pick<URLSearchParams, "get">;
 
@@ -109,11 +109,97 @@ type FeedFollow = {
   follower: FeedActor;
 };
 
+type FeedEvent =
+  | ReturnType<typeof eventFromFollowedThread>
+  | ReturnType<typeof eventFromFollowedPost>
+  | ReturnType<typeof eventFromReplyToMyPost>
+  | ReturnType<typeof eventFromRepliesToMyPostGroup>
+  | ReturnType<typeof eventFromPostInMyThread>
+  | ReturnType<typeof eventFromPostsInMyThreadGroup>
+  | ReturnType<typeof eventFromNewFollower>
+  | ReturnType<typeof eventFromFavoriteTeamMatch>
+  | ReturnType<typeof eventFromFavoriteTeamThread>
+  | ReturnType<typeof eventFromFavoriteTeamThreadGroup>
+  | ReturnType<typeof eventFromFavoriteTeamMatchThread>;
+
 function buildPreviewText(value: unknown, fallback = "No preview available yet.") {
   if (typeof value !== "string") return fallback;
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return fallback;
   return normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized;
+}
+
+function getLatestFeedPost(posts: FeedPost[]) {
+  return posts.reduce((latest, current) =>
+    current.createdAt.getTime() > latest.createdAt.getTime() ? current : latest
+  );
+}
+
+function getDistinctActorNames(posts: FeedPost[]) {
+  return [...new Set(posts.map((post) => post.author.username).filter(Boolean))];
+}
+
+function formatActorList(usernames: string[]) {
+  if (usernames.length === 0) return "Fans";
+  if (usernames.length === 1) return usernames[0];
+  if (usernames.length === 2) return `${usernames[0]} and ${usernames[1]}`;
+  return `${usernames[0]}, ${usernames[1]}, and ${usernames.length - 2} others`;
+}
+
+function formatThreadTitleList(titles: string[]) {
+  const cleanedTitles = titles
+    .map((title) => title.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (cleanedTitles.length === 0) return "Fresh discussion is picking up.";
+  if (cleanedTitles.length === 1) return `Latest: "${cleanedTitles[0]}".`;
+  if (cleanedTitles.length === 2) {
+    return `Latest: "${cleanedTitles[0]}" and "${cleanedTitles[1]}".`;
+  }
+  return `Latest: "${cleanedTitles[0]}", "${cleanedTitles[1]}", and ${cleanedTitles.length - 2} more.`;
+}
+
+function groupThreadsByBurst(threads: FeedThread[], windowMs: number) {
+  const sortedThreads = [...threads].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  return sortedThreads.reduce<FeedThread[][]>((groups, thread) => {
+    const activeGroup = groups.at(-1);
+    if (!activeGroup) {
+      groups.push([thread]);
+      return groups;
+    }
+
+    const previousThread = activeGroup.at(-1);
+    if (
+      previousThread &&
+      previousThread.createdAt.getTime() - thread.createdAt.getTime() <= windowMs
+    ) {
+      activeGroup.push(thread);
+      return groups;
+    }
+
+    groups.push([thread]);
+    return groups;
+  }, []);
+}
+
+function groupPostsByParentId(posts: FeedPost[]) {
+  return posts.reduce<Map<number, FeedPost[]>>((groups, post) => {
+    if (typeof post.parentId !== "number") return groups;
+    const existingPosts = groups.get(post.parentId) ?? [];
+    existingPosts.push(post);
+    groups.set(post.parentId, existingPosts);
+    return groups;
+  }, new Map<number, FeedPost[]>());
+}
+
+function groupPostsByThreadId(posts: FeedPost[]) {
+  return posts.reduce<Map<number, FeedPost[]>>((groups, post) => {
+    const existingPosts = groups.get(post.threadId) ?? [];
+    existingPosts.push(post);
+    groups.set(post.threadId, existingPosts);
+    return groups;
+  }, new Map<number, FeedPost[]>());
 }
 
 function parsePagination(searchParams: SearchParamsLike) {
@@ -200,6 +286,33 @@ function eventFromReplyToMyPost(post: FeedPost, directReplyCount = 0) {
   };
 }
 
+function eventFromRepliesToMyPostGroup(posts: FeedPost[]) {
+  const latestPost = getLatestFeedPost(posts);
+  const usernames = getDistinctActorNames(posts);
+  const replyCount = posts.length;
+
+  return {
+    id: `reply-group-${latestPost.parentId}`,
+    type: "REPLIES_TO_MY_POST_GROUP" as const,
+    createdAt: latestPost.createdAt,
+    actor: null,
+    entity: {
+      id: latestPost.parentId as number,
+      kind: "post" as const,
+      threadId: latestPost.threadId,
+      threadTitle: latestPost.thread?.title || null,
+      threadType: latestPost.thread?.type || null,
+      threadTeamName: latestPost.thread?.team?.name || null,
+      threadTeamCrestUrl: latestPost.thread?.team?.crestUrl || null,
+      parentId: latestPost.parentId,
+      parentAuthorUsername: null,
+      directReplyCount: replyCount,
+      isReply: false,
+    },
+    summary: `Latest from ${formatActorList(usernames)}.`,
+  };
+}
+
 function eventFromPostInMyThread(post: FeedPost, directReplyCount = 0) {
   return {
     id: `post-in-my-thread-${post.id}`,
@@ -217,6 +330,31 @@ function eventFromPostInMyThread(post: FeedPost, directReplyCount = 0) {
       directReplyCount,
     },
     summary: `${post.author.username} posted in your thread "${post.thread?.title || ""}"`.trim(),
+  };
+}
+
+function eventFromPostsInMyThreadGroup(posts: FeedPost[]) {
+  const latestPost = getLatestFeedPost(posts);
+  const usernames = getDistinctActorNames(posts);
+  const postCount = posts.length;
+
+  return {
+    id: `thread-activity-group-${latestPost.threadId}`,
+    type: "POSTS_IN_MY_THREAD_GROUP" as const,
+    createdAt: latestPost.createdAt,
+    actor: null,
+    entity: {
+      id: latestPost.threadId,
+      kind: "thread" as const,
+      threadType: latestPost.thread?.type || null,
+      title: latestPost.thread?.title || null,
+      teamId: null,
+      matchId: null,
+      teamName: latestPost.thread?.team?.name || null,
+      teamCrestUrl: latestPost.thread?.team?.crestUrl || null,
+      directPostCount: postCount,
+    },
+    summary: `Latest from ${formatActorList(usernames)}.`,
   };
 }
 
@@ -244,7 +382,7 @@ function eventFromFavoriteTeamMatch(match: FeedMatch, favoriteTeamId: number) {
   return {
     id: `favorite-team-match-${match.id}`,
     type: "FAVORITE_TEAM_MATCH_SCORE",
-    createdAt: match.updatedAt,
+    createdAt: match.utcDate,
     actor: null,
     entity: {
       id: match.id,
@@ -287,18 +425,49 @@ function eventFromFavoriteTeamThread(thread: FeedThread, directPostCount = 0) {
       threadType: thread.type,
       title: thread.title,
       teamId: thread.teamId,
+      teamName: thread.team?.name || null,
+      teamCrestUrl: thread.team?.crestUrl || null,
       directPostCount,
     },
     summary: "New thread in your favorite team's forum",
   };
 }
 
+function eventFromFavoriteTeamThreadGroup(threads: FeedThread[]) {
+  const latestThread = threads.reduce((latest, current) =>
+    current.createdAt.getTime() > latest.createdAt.getTime() ? current : latest
+  );
+
+  return {
+    id: `favorite-team-thread-group-${latestThread.teamId}-${latestThread.createdAt.toISOString()}`,
+    type: "FAVORITE_TEAM_THREAD_GROUP" as const,
+    createdAt: latestThread.createdAt,
+    actor: null,
+    entity: {
+      id: latestThread.id,
+      kind: "thread" as const,
+      threadType: latestThread.type,
+      title: latestThread.title,
+      teamId: latestThread.teamId,
+      teamName: latestThread.team?.name || null,
+      teamCrestUrl: latestThread.team?.crestUrl || null,
+      directPostCount: threads.length,
+    },
+    summary: formatThreadTitleList(threads.map((thread) => thread.title).slice(0, 3)),
+  };
+}
+
 function eventFromFavoriteTeamMatchThread(thread: FeedThread, directPostCount = 0) {
+  const matchStatus = typeof thread.match?.status === "string" ? thread.match.status.toUpperCase() : "";
+  const createdAt =
+    matchStatus === "SCHEDULED" || matchStatus === "TIMED"
+      ? thread.openAt
+      : thread.match?.utcDate || thread.openAt;
+
   return {
     id: `favorite-team-match-thread-${thread.id}`,
     type: "FAVORITE_TEAM_MATCH_THREAD",
-    // Use thread opening time so the card reflects when discussion actually opened.
-    createdAt: thread.openAt,
+    createdAt,
     actor: thread.author,
     entity: {
       id: thread.id,
@@ -358,7 +527,6 @@ export async function GET(request: NextRequest) {
     const followedUserIds = following.map((row) => row.followingId);
     const favoriteTeamId = dbUser.favoriteTeamId;
     const now = new Date();
-    const recentlyClosedAt = new Date(now.getTime() - RECENT_MATCH_THREAD_WINDOW_MS);
 
     const [
       followedThreads,
@@ -446,7 +614,14 @@ export async function GET(request: NextRequest) {
             select: { id: true, username: true, avatar: true },
           },
           thread: {
-            select: { id: true, title: true },
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              team: {
+                select: { name: true, crestUrl: true },
+              },
+            },
           },
           parent: {
             select: {
@@ -482,7 +657,14 @@ export async function GET(request: NextRequest) {
             select: { id: true, username: true, avatar: true },
           },
           thread: {
-            select: { id: true, title: true },
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              team: {
+                select: { name: true, crestUrl: true },
+              },
+            },
           },
           parent: {
             select: {
@@ -537,6 +719,7 @@ export async function GET(request: NextRequest) {
       favoriteTeamId
         ? prisma.thread.findMany({
             where: {
+              authorId: { not: user.id },
               teamId: favoriteTeamId,
               type: "TEAM",
               isHidden: false,
@@ -548,16 +731,20 @@ export async function GET(request: NextRequest) {
               author: {
                 select: { id: true, username: true, avatar: true },
               },
+              team: {
+                select: { id: true, name: true, crestUrl: true },
+              },
             },
           })
         : Promise.resolve([]),
       favoriteTeamId
         ? prisma.thread.findMany({
             where: {
+              authorId: { not: user.id },
               type: "MATCH",
               isHidden: false,
               openAt: { lte: now },
-              OR: [{ closedAt: null }, { closedAt: { gte: recentlyClosedAt } }],
+              closedAt: null,
               match: {
                 OR: [
                   { homeTeamId: favoriteTeamId },
@@ -651,30 +838,54 @@ export async function GET(request: NextRequest) {
       (match) => !matchIdsWithThreadEvents.has(match.id)
     );
 
-    const events = [
+    const repliesToMyPostGroups = groupPostsByParentId(repliesToMyPosts);
+    const postsInMyThreadGroups = groupPostsByThreadId(postsInMyThreads);
+
+    const favoriteTeamThreadBursts = groupThreadsByBurst(
+      favoriteTeamThreads,
+      TEAM_THREAD_GROUP_WINDOW_MS
+    );
+
+    const groupedReplies = Array.from(repliesToMyPostGroups.values()) as FeedPost[][];
+    const groupedThreadPosts = Array.from(postsInMyThreadGroups.values()) as FeedPost[][];
+
+    const replyEvents: FeedEvent[] = groupedReplies.map((posts: FeedPost[]) =>
+      posts.length > 1
+        ? eventFromRepliesToMyPostGroup(posts)
+        : eventFromReplyToMyPost(posts[0], directReplyCountByPostId.get(posts[0].id) || 0)
+    );
+
+    const threadActivityEvents: FeedEvent[] = groupedThreadPosts.map((posts: FeedPost[]) =>
+      posts.length > 1
+        ? eventFromPostsInMyThreadGroup(posts)
+        : eventFromPostInMyThread(posts[0], directReplyCountByPostId.get(posts[0].id) || 0)
+    );
+
+    const favoriteTeamThreadEvents: FeedEvent[] = favoriteTeamThreadBursts.map((threads) =>
+      threads.length > 1
+        ? eventFromFavoriteTeamThreadGroup(threads)
+        : eventFromFavoriteTeamThread(threads[0], directPostCountByThreadId.get(threads[0].id) || 0)
+    );
+
+    const events: FeedEvent[] = [
       ...followedThreads.map((thread) =>
         eventFromFollowedThread(thread, directPostCountByThreadId.get(thread.id) || 0)
       ),
       ...followedPosts.map((post) =>
         eventFromFollowedPost(post, directReplyCountByPostId.get(post.id) || 0)
       ),
-      ...repliesToMyPosts.map((post) =>
-        eventFromReplyToMyPost(post, directReplyCountByPostId.get(post.id) || 0)
-      ),
-      ...postsInMyThreads.map((post) =>
-        eventFromPostInMyThread(post, directReplyCountByPostId.get(post.id) || 0)
-      ),
+      ...replyEvents,
+      ...threadActivityEvents,
       ...newFollowers.map((follow) => eventFromNewFollower(follow)),
-      ...(favoriteTeamId
-        ? favoriteTeamMatchesWithoutThreadEvent.map((match) =>
-            eventFromFavoriteTeamMatch(match, favoriteTeamId)
-          )
-        : []),
-      ...favoriteTeamThreads.map((thread) =>
-        eventFromFavoriteTeamThread(thread, directPostCountByThreadId.get(thread.id) || 0)
+      ...favoriteTeamMatchesWithoutThreadEvent.map((match) =>
+        eventFromFavoriteTeamMatch(match, favoriteTeamId as number)
       ),
+      ...favoriteTeamThreadEvents,
       ...favoriteTeamMatchThreads.map((thread) =>
-        eventFromFavoriteTeamMatchThread(thread, directPostCountByThreadId.get(thread.id) || 0)
+        eventFromFavoriteTeamMatchThread(
+          thread,
+          directPostCountByThreadId.get(thread.id) || 0
+        )
       ),
     ];
 
