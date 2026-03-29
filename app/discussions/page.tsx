@@ -709,7 +709,7 @@ export default function DiscussionsPage() {
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(INITIAL_FILTERS);
   const [threads, setThreads] = useState<ThreadRecord[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
-  const previewPanelRef = useRef<HTMLElement | null>(null);
+  const previewPanelRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
