@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -29,6 +29,7 @@ type ProfilePayload = {
   favoriteTeam: {
     id: number;
     name: string;
+    shortName: string;
     crestUrl: string | null;
     palette?: {
       primaryRgb: string;
@@ -169,6 +170,11 @@ function favoriteTeamLightOverlayStyle(team: ProfilePayload["favoriteTeam"]): CS
   };
 }
 
+function profileFavoriteTeamLabel(team: ProfilePayload["favoriteTeam"]) {
+  if (!team) return "";
+  return team.shortName?.trim() || team.name;
+}
+
 function StatChip({
   label,
   value,
@@ -197,7 +203,7 @@ function StatChip({
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex min-w-[128px] items-center gap-2.5 rounded-full bg-[color:var(--surface-elevated)] px-3 py-2 shadow-[0_6px_14px_rgba(2,8,23,0.05)] transition hover:bg-[color:var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/45"
+        className="inline-flex w-full min-w-0 items-center gap-2.5 rounded-full bg-[color:var(--surface-elevated)] px-3 py-2 shadow-[0_6px_14px_rgba(2,8,23,0.05)] transition hover:bg-[color:var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/45 sm:min-w-[128px] sm:w-auto"
       >
         {content}
       </button>
@@ -205,7 +211,7 @@ function StatChip({
   }
 
   return (
-    <div className="inline-flex min-w-[128px] items-center gap-2.5 rounded-full bg-[color:var(--surface-elevated)] px-3 py-2 shadow-[0_6px_14px_rgba(2,8,23,0.05)]">
+    <div className="inline-flex w-full min-w-0 items-center gap-2.5 rounded-full bg-[color:var(--surface-elevated)] px-3 py-2 shadow-[0_6px_14px_rgba(2,8,23,0.05)] sm:min-w-[128px] sm:w-auto">
       {content}
     </div>
   );
@@ -330,23 +336,23 @@ function ProfileTabPagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2">
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2 sm:flex-nowrap sm:justify-between sm:gap-3">
       <button
         type="button"
         onClick={onPrevious}
         disabled={loading || page <= 1}
-        className="rounded-md border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="order-2 w-[calc(50%-0.25rem)] rounded-md border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60 sm:order-1 sm:w-auto"
       >
         Previous
       </button>
-      <p className="text-xs text-[color:var(--muted-foreground)]">
+      <p className="order-1 w-full text-center text-xs text-[color:var(--muted-foreground)] sm:order-2 sm:w-auto">
         Page {page} of {totalPages}
       </p>
       <button
         type="button"
         onClick={onNext}
         disabled={loading || page >= totalPages}
-        className="rounded-md border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="order-3 w-[calc(50%-0.25rem)] rounded-md border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
         Next
       </button>
@@ -1305,10 +1311,12 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
             style={bannerLightStyle}
           />
           {profile.favoriteTeam ? (
-            <div className="absolute right-4 top-3 inline-flex items-center gap-3 rounded-xl border border-white/25 bg-black/30 px-3 py-2 backdrop-blur-sm shadow-[0_10px_24px_rgba(2,8,23,0.24)] sm:right-6 [html[data-theme='light']_&]:border-slate-200/80 [html[data-theme='light']_&]:bg-slate-50/72 [html[data-theme='light']_&]:shadow-[0_8px_20px_rgba(15,23,42,0.10)]">
-              <div className="text-right leading-tight">
+            <div className="absolute left-4 right-4 top-3 inline-flex items-center justify-between gap-3 rounded-xl border border-white/25 bg-black/30 px-3 py-2 backdrop-blur-sm shadow-[0_10px_24px_rgba(2,8,23,0.24)] sm:left-auto sm:right-6 sm:w-auto sm:justify-start [html[data-theme='light']_&]:border-slate-200/80 [html[data-theme='light']_&]:bg-slate-50/72 [html[data-theme='light']_&]:shadow-[0_8px_20px_rgba(15,23,42,0.10)]">
+              <div className="min-w-0 leading-tight sm:text-right">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-white/75 [html[data-theme='light']_&]:text-slate-500">Favorite Team</p>
-                <p className="max-w-[170px] truncate text-sm font-semibold text-white [html[data-theme='light']_&]:text-slate-800">{profile.favoriteTeam.name}</p>
+                <p className="max-w-[170px] truncate text-sm font-semibold text-white [html[data-theme='light']_&]:text-slate-800">
+                  {profileFavoriteTeamLabel(profile.favoriteTeam)}
+                </p>
               </div>
               {profile.favoriteTeam.crestUrl ? (
                 <img
@@ -1326,7 +1334,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
         </div>
         <div className="px-5 pb-5 sm:px-6">
           <div className="relative z-20 -mt-16 sm:-mt-20">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="shrink-0">
                 {profileAvatarSrc ? (
                   <img
@@ -1342,16 +1350,16 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                 )}
               </div>
               {isOwnProfile ? (
-                <Link href="/settings?tab=profile" className="btn-secondary self-start sm:self-auto">
+                <Link href="/settings?tab=profile" className="btn-secondary w-full self-stretch text-center sm:w-auto sm:self-auto">
                   Edit Profile
                 </Link>
               ) : canFollow ? (
-                <div className="self-start sm:self-auto">
+                <div className="w-full self-stretch sm:w-auto sm:self-auto">
                   <button
                     type="button"
                     onClick={() => void handleFollowToggle()}
                     disabled={followBusy}
-                    className={`min-w-[132px] rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+                    className={`w-full min-w-[132px] rounded-lg border px-4 py-2 text-sm font-semibold transition sm:w-auto ${
                       profile.isFollowing
                         ? "border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] text-[color:var(--foreground)] hover:bg-[color:var(--surface)]"
                         : "border-sky-500/70 bg-sky-500 text-white hover:bg-sky-400"
@@ -1364,23 +1372,23 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                   ) : null}
                 </div>
               ) : !isOwnProfile && viewerUserId !== null && isRestrictedProfile ? (
-                <span className="inline-flex items-center self-start rounded-lg border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[color:var(--muted-foreground)] sm:self-auto">
+                <span className="inline-flex w-full items-center justify-center self-stretch rounded-lg border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-2 text-sm font-semibold text-[color:var(--muted-foreground)] sm:w-auto sm:self-auto">
                   Follow unavailable
                 </span>
               ) : (
-                <Link href="/login" className="btn-secondary self-start sm:self-auto">
+                <Link href="/login" className="btn-secondary w-full self-stretch text-center sm:w-auto sm:self-auto">
                   Sign In to Follow
                 </Link>
               )}
             </div>
           </div>
 
-          <div className="mt-3">
-            <h1 className="text-3xl font-bold tracking-tight text-[color:var(--foreground)] sm:text-4xl">{profile.username}</h1>
+          <div className="mt-3 text-center sm:text-left">
+            <h1 className="break-words text-3xl font-bold tracking-tight text-[color:var(--foreground)] sm:text-4xl">{profile.username}</h1>
           </div>
 
           <div className="mt-3 flex flex-col gap-3 sm:mt-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
               <StatChip
                 label="followers"
                 value={profile._count.followers}
@@ -1394,7 +1402,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                 onClick={() => setSocialModal("following")}
               />
             </div>
-            <div className="flex items-center gap-x-3 gap-y-1 text-sm text-[color:var(--muted-foreground)] sm:justify-end">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-sm text-[color:var(--muted-foreground)] sm:justify-end sm:text-right">
               <span>Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
               <span className={statusTone(profile.status)}>{profile.status}</span>
             </div>
@@ -1661,7 +1669,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
       ) : null}
 
       <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[color:var(--foreground)]">
             <BarChart3 className="h-5 w-5" />
             Activity (Last 14 Days)
@@ -1675,8 +1683,8 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
           </p>
         ) : (
           <div className="rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-3">
-            <div className="flex h-36 items-end gap-1.5">
-              {activitySeries.map((point) => (
+            <div className="flex h-36 items-end gap-1">
+              {activitySeries.map((point, index) => (
                 <div key={point.date} className="flex h-full min-w-0 flex-1 flex-col items-center gap-1">
                   <div className="flex w-full flex-1 items-end">
                     <div
@@ -1694,7 +1702,9 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                       title={`${point.total} on ${point.date}`}
                     />
                   </div>
-                  <span className="text-[10px] text-[color:var(--muted-foreground)]">{dateLabel(point.date)}</span>
+                  <span className={`text-[10px] text-[color:var(--muted-foreground)] ${index % 2 === 1 ? "hidden sm:inline" : ""}`}>
+                    {dateLabel(point.date)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1747,7 +1757,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
             aria-labelledby="profile-threads-tab"
             className="space-y-2"
           >
-            <div className="mb-2 flex justify-end">
+            <div className="mb-2 flex justify-start sm:justify-end">
               <Link href="/discussions" className="text-xs font-semibold text-sky-400 hover:text-sky-300">
                 Open Discussions
               </Link>
@@ -1780,8 +1790,8 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                     href={`/threads/${thread.id}`}
                     className="block rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2.5 transition hover:border-sky-400/55 hover:bg-[color:var(--surface)]"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">{thread.title}</p>
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                      <p className="break-words text-sm font-semibold text-[color:var(--foreground)] sm:truncate">{thread.title}</p>
                       <p className="shrink-0 text-xs text-[color:var(--muted-foreground)]">{formatRelativeTime(thread.createdAt)}</p>
                     </div>
                     <p className="mt-1 text-xs text-[color:var(--muted-foreground)]">
@@ -1833,8 +1843,8 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                     href={post.thread?.id ? `/threads/${post.thread.id}` : "/discussions"}
                     className="block rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2.5 transition hover:border-sky-400/55 hover:bg-[color:var(--surface)]"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-foreground)]">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                      <p className="break-words text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-foreground)] sm:truncate">
                         {post.isReply ? "Reply" : "Post"} | {post.thread?.title || "Discussion"}
                       </p>
                       <p className="shrink-0 text-xs text-[color:var(--muted-foreground)]">{formatRelativeTime(post.createdAt)}</p>
@@ -1857,7 +1867,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
 
       {socialModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[1px]"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-[1px] sm:items-center sm:p-4"
           onClick={() => setSocialModal(null)}
         >
           <div
@@ -1865,7 +1875,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
             aria-modal="true"
             aria-label={modalTitle}
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-md rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_18px_38px_rgba(2,8,23,0.35)]"
+            className="flex max-h-[84dvh] w-full max-w-md flex-col rounded-t-3xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_18px_38px_rgba(2,8,23,0.35)] sm:max-h-[80vh] sm:rounded-2xl"
           >
             <div className="mb-3 flex items-center justify-between border-b border-[color:var(--surface-border)] pb-2">
               <h3 className="text-lg font-bold text-[color:var(--foreground)]">{modalTitle}</h3>
@@ -1888,11 +1898,11 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
               />
               <p className="text-xs text-[color:var(--muted-foreground)]">
                 {modalTotal} result{modalTotal === 1 ? "" : "s"}
-                {modalTotalPages > 1 ? ` â€¢ page ${modalPage} of ${modalTotalPages}` : ""}
+                {modalTotalPages > 1 ? ` • page ${modalPage} of ${modalTotalPages}` : ""}
               </p>
             </div>
 
-            <div className="max-h-[50vh] divide-y divide-[color:var(--surface-border)] overflow-auto pr-1">
+            <div className="min-h-0 flex-1 divide-y divide-[color:var(--surface-border)] overflow-auto pr-1">
               {modalLoading ? (
                 <p className="px-3 py-3 text-sm text-[color:var(--muted-foreground)]">Loading {modalTitle.toLowerCase()}...</p>
               ) : modalUsers.length === 0 ? (
@@ -1926,7 +1936,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
                 })
               )}
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2">
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--surface-border)] pt-3">
               <button
                 type="button"
                 onClick={() => setModalPage((current) => Math.max(1, current - 1))}
@@ -1953,3 +1963,4 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
     </section>
   );
 }
+

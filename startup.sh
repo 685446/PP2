@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-npm install
-npx prisma generate
-npx prisma migrate deploy
-npx tsx prisma/seed.ts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+"${SCRIPT_DIR}/start.sh"

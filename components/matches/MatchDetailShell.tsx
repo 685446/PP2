@@ -97,6 +97,30 @@ function formatKickoff(input: string) {
   })} ET`;
 }
 
+function formatKickoffDisplayParts(input: string) {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      dayLabel: "Kickoff",
+      timeLabel: "TBD",
+      zoneLabel: "",
+    };
+  }
+
+  return {
+    dayLabel: date.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }),
+    timeLabel: date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+    zoneLabel: "ET",
+  };
+}
+
 function formatRelativeTime(input: string) {
   const date = new Date(input);
   if (Number.isNaN(date.getTime())) return "recently";
@@ -187,6 +211,10 @@ export default function MatchDetailShell({ matchId }: MatchDetailShellProps) {
     }
     return formatKickoff(match.utcDate);
   }, [match]);
+  const kickoffDisplay = useMemo(
+    () => (match ? formatKickoffDisplayParts(match.utcDate) : null),
+    [match]
+  );
 
   return (
     <section className="mx-auto w-full max-w-[1120px] space-y-5">
@@ -220,14 +248,14 @@ export default function MatchDetailShell({ matchId }: MatchDetailShellProps) {
 
       {state === "ready" && match && (
         <>
-          <div className="relative overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-6 shadow-[0_12px_28px_rgba(2,8,23,0.1)]">
+          <div className="relative overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_12px_28px_rgba(2,8,23,0.1)] sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_10%_0%,rgba(56,189,248,0.14),transparent_58%),radial-gradient(120%_90%_at_100%_0%,rgba(16,185,129,0.12),transparent_62%)]" />
             <div className="relative">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-accent)]">
                   Premier League Match
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <span
                     className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
                       statusLabel(match.status) === "LIVE"
@@ -243,29 +271,94 @@ export default function MatchDetailShell({ matchId }: MatchDetailShellProps) {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                <div className="flex flex-col items-center gap-2 text-center">
+              <div className="mt-6 sm:hidden">
+                <div className="text-center">
+                  {match.homeScore !== null && match.awayScore !== null ? (
+                    <>
+                      <p className="text-4xl font-black tracking-tight text-[color:var(--foreground)]">
+                        {scoreText}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
+                        {isFinished(match.status) ? "Full Time" : "Kickoff"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
+                        {kickoffDisplay?.dayLabel}
+                      </p>
+                      <p className="mt-2 text-5xl font-black tracking-tight text-[color:var(--foreground)]">
+                        {kickoffDisplay?.timeLabel}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                        {kickoffDisplay?.zoneLabel}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[color:var(--surface-border)] pt-5">
+                  <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+                    <TeamCrest team={match.homeTeam} className="h-14 w-14 object-contain" />
+                    <Link
+                      href={`/teams/${match.homeTeam.id}`}
+                      className="line-clamp-3 break-words text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline [overflow-wrap:anywhere]"
+                    >
+                      {match.homeTeam.name}
+                    </Link>
+                  </div>
+
+                  <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+                    <TeamCrest team={match.awayTeam} className="h-14 w-14 object-contain" />
+                    <Link
+                      href={`/teams/${match.awayTeam.id}`}
+                      className="line-clamp-3 break-words text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline [overflow-wrap:anywhere]"
+                    >
+                      {match.awayTeam.name}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 sm:grid">
+                <div className="flex min-w-0 flex-col items-center gap-2 text-center">
                   <TeamCrest team={match.homeTeam} className="h-16 w-16 object-contain" />
                   <Link
                     href={`/teams/${match.homeTeam.id}`}
-                    className="text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline"
+                    className="line-clamp-3 break-words text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline [overflow-wrap:anywhere]"
                   >
                     {match.homeTeam.name}
                   </Link>
                 </div>
 
-                <div className="text-center">
-                  <p className="text-4xl font-black tracking-tight text-[color:var(--foreground)]">{scoreText}</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
-                    {isFinished(match.status) ? "Full Time" : "Kickoff"}
-                  </p>
+                <div className="min-w-[9rem] text-center">
+                  {match.homeScore !== null && match.awayScore !== null ? (
+                    <>
+                      <p className="text-5xl font-black tracking-tight text-[color:var(--foreground)]">{scoreText}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
+                        {isFinished(match.status) ? "Full Time" : "Kickoff"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
+                        {kickoffDisplay?.dayLabel}
+                      </p>
+                      <p className="mt-2 text-5xl font-black tracking-tight text-[color:var(--foreground)]">
+                        {kickoffDisplay?.timeLabel}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                        {kickoffDisplay?.zoneLabel}
+                      </p>
+                    </>
+                  )}
                 </div>
 
-                <div className="flex flex-col items-center gap-2 text-center">
+                <div className="flex min-w-0 flex-col items-center gap-2 text-center">
                   <TeamCrest team={match.awayTeam} className="h-16 w-16 object-contain" />
                   <Link
                     href={`/teams/${match.awayTeam.id}`}
-                    className="text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline"
+                    className="line-clamp-3 break-words text-base font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline [overflow-wrap:anywhere]"
                   >
                     {match.awayTeam.name}
                   </Link>

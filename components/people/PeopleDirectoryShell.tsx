@@ -121,12 +121,12 @@ export default function PeopleDirectoryShell() {
     <section className="mx-auto w-full max-w-[1120px] space-y-5">
       <div className="relative overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_10px_26px_rgba(2,8,23,0.08)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_90%_at_10%_0%,rgba(14,165,233,0.14),transparent_56%),radial-gradient(120%_80%_at_100%_0%,rgba(56,189,248,0.14),transparent_62%)]" />
-        <div className="relative space-y-5 p-5 sm:p-6">
+        <div className="relative space-y-4 p-4 sm:space-y-5 sm:p-6">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-accent)]">
               People
             </p>
-            <h1 className="text-3xl font-bold text-[color:var(--foreground)] sm:text-4xl">
+            <h1 className="text-2xl font-bold text-[color:var(--foreground)] sm:text-4xl">
               Find Fans Across SportsDeck
             </h1>
             <p className="max-w-2xl text-sm text-[color:var(--muted-foreground)] sm:text-base">
@@ -143,7 +143,7 @@ export default function PeopleDirectoryShell() {
               <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Browse</p>
               <p className="mt-1 text-sm font-semibold text-[color:var(--foreground)]">Search by username or club</p>
             </div>
-            <div className="rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2.5">
+            <div className="rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-2.5 sm:col-span-2 lg:col-span-1">
               <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Open</p>
               <p className="mt-1 text-sm font-semibold text-[color:var(--foreground)]">Click a card for full profile</p>
             </div>
@@ -197,26 +197,41 @@ export default function PeopleDirectoryShell() {
                       <img
                         src={user.avatar}
                         alt={`${user.username} avatar`}
-                        className="h-12 w-12 rounded-full object-cover"
+                        className="h-12 w-12 rounded-full object-cover sm:h-14 sm:w-14"
                       />
                     ) : (
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--surface-elevated)] text-lg font-bold text-[color:var(--foreground)]">
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--surface-elevated)] text-lg font-bold text-[color:var(--foreground)] sm:h-14 sm:w-14">
                         {user.username.slice(0, 1).toUpperCase()}
                       </span>
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-base font-bold text-[color:var(--foreground)]">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <p className="break-words text-base font-bold text-[color:var(--foreground)]">
                           {user.username}
                         </p>
-                        <span className="shrink-0 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted-foreground)]">
+                        <span className="w-fit shrink-0 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted-foreground)]">
                           {statusLabel(user.status)}
                         </span>
                       </div>
-                      <p className="mt-1 truncate text-sm text-[color:var(--muted-foreground)]">
-                        {user.favoriteTeam ? `Favorite team: ${user.favoriteTeam.name}` : "No favorite team selected"}
-                      </p>
+                      {user.favoriteTeam ? (
+                        <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+                          {user.favoriteTeam.crestUrl ? (
+                            <img
+                              src={user.favoriteTeam.crestUrl}
+                              alt=""
+                              className="h-4 w-4 shrink-0 object-contain"
+                            />
+                          ) : null}
+                          <span className="min-w-0 break-words">
+                            Favorite team: {user.favoriteTeam.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                          No favorite team selected
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -243,16 +258,16 @@ export default function PeopleDirectoryShell() {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3">
+          <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-[color:var(--muted-foreground)]">
               Page {page} of {totalPages}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full gap-2 sm:w-auto">
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page <= 1}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary flex-1 justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
               >
                 Previous
               </button>
@@ -260,7 +275,7 @@ export default function PeopleDirectoryShell() {
                 type="button"
                 onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                 disabled={page >= totalPages}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary flex-1 justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
               >
                 Next
               </button>

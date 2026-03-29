@@ -18,6 +18,7 @@ type UpdateUserBody = {
 type ProfileFavoriteTeam = {
   id: number;
   name: string;
+  shortName: string;
   crestUrl: string | null;
   palette?: Awaited<ReturnType<typeof getTeamPalette>>;
 } | null;
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest, { params }: UserRouteParams) {
           select: {
             id: true,
             name: true,
+            shortName: true,
             crestUrl: true,
           },
         },

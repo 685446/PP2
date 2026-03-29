@@ -143,13 +143,13 @@ export default function NotificationsPage() {
 
   return (
     <section className="mx-auto w-full max-w-[1080px] space-y-5">
-      <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_10px_26px_rgba(2,8,23,0.08)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_10px_26px_rgba(2,8,23,0.08)] sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-500">
               Notifications
             </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-[color:var(--foreground)]">
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-[color:var(--foreground)] sm:text-3xl">
               Stay on top of every update
             </h1>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
@@ -157,7 +157,7 @@ export default function NotificationsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[color:var(--foreground)]">
               <Bell className="h-3.5 w-3.5 text-sky-500" />
               {state.total} recent
@@ -165,7 +165,7 @@ export default function NotificationsPage() {
             <button
               type="button"
               onClick={handleRefresh}
-              className="btn-secondary"
+              className="btn-secondary w-full justify-center sm:w-auto"
               disabled={state.status === "loading"}
             >
               {state.status === "loading" ? (
@@ -190,11 +190,11 @@ export default function NotificationsPage() {
           <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
             Your personal updates appear here as soon as you log in.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/login?next=%2Fnotifications" className="btn-primary">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/login?next=%2Fnotifications" className="btn-primary w-full justify-center sm:w-auto">
               Sign In
             </Link>
-            <Link href="/register" className="btn-secondary">
+            <Link href="/register" className="btn-secondary w-full justify-center sm:w-auto">
               Create Account
             </Link>
           </div>
@@ -239,7 +239,7 @@ export default function NotificationsPage() {
             type="button"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {loadingMore ? (
               <>

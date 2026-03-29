@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -431,6 +431,7 @@ function sentimentPillClass(value: string) {
 type CommentTreeNodeProps = {
   node: CommentNodePayload;
   depth: number;
+  compactLayout: boolean;
   highlightedPostId: number | null;
   collapsedPosts: Record<number, boolean>;
   toggleCollapsedPost: (postId: number) => void;
@@ -472,6 +473,7 @@ type CommentTreeNodeProps = {
 function CommentTreeNode({
   node,
   depth,
+  compactLayout,
   highlightedPostId,
   collapsedPosts,
   toggleCollapsedPost,
@@ -532,10 +534,13 @@ function CommentTreeNode({
     !node.isDeleted &&
     Boolean(session?.user && node.author?.id && session.user.id !== node.author.id);
   const showReportForm = reportingPostId === node.id;
-  const nestedOffsetPx = Math.max(visualDepth, 1) * 24;
-  const guideColumnLeftPx = Math.max(visualDepth - 1, 0) * 24;
+  const branchIndentPx = compactLayout ? 18 : 24;
+  const guideGutterPx = compactLayout ? 22 : THREAD_GUIDE_GUTTER_PX;
+  const branchGapPx = compactLayout ? 12 : THREAD_BRANCH_GAP_PX;
+  const nestedOffsetPx = Math.max(visualDepth, 1) * branchIndentPx;
+  const guideColumnLeftPx = Math.max(visualDepth - 1, 0) * branchIndentPx;
   const guideLeftPx = guideColumnLeftPx + 12;
-  const cardOffsetPx = nestedOffsetPx + THREAD_GUIDE_GUTTER_PX;
+  const cardOffsetPx = nestedOffsetPx + guideGutterPx;
   const connectorWidthPx = Math.max(cardOffsetPx - guideLeftPx - 12, 10);
   const cardClass =
     depth === 0
@@ -575,6 +580,7 @@ function CommentTreeNode({
           key={reply.id}
           node={reply}
           depth={depth + 1}
+          compactLayout={compactLayout}
           highlightedPostId={highlightedPostId}
           collapsedPosts={collapsedPosts}
           toggleCollapsedPost={toggleCollapsedPost}
@@ -631,8 +637,8 @@ function CommentTreeNode({
 
   const card = (
     <div id={`post-${node.id}`} className={cardClass}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
           {!node.isDeleted &&
             (node.author ? (
               authorProfileHref ? (
@@ -681,7 +687,9 @@ function CommentTreeNode({
             </span>
           )}
         </div>
-        <span className="text-xs text-[color:var(--muted-foreground)]">{formatDateTime(node.createdAt)}</span>
+        <span className="text-xs text-[color:var(--muted-foreground)] sm:text-right">
+          {formatDateTime(node.createdAt)}
+        </span>
       </div>
 
       {showEditForm && !node.isDeleted ? (
@@ -698,11 +706,11 @@ function CommentTreeNode({
             rows={3}
             className="w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-sky-500/45 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-[color:var(--muted-foreground)]">
               {(editDrafts[node.id] ?? node.content).trim().length}/10000 characters
             </span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={() => {
@@ -714,7 +722,7 @@ function CommentTreeNode({
                   });
                 }}
                 disabled={editPendingPostId === node.id}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 Cancel
               </button>
@@ -725,7 +733,7 @@ function CommentTreeNode({
                   editPendingPostId === node.id ||
                   !((editDrafts[node.id] ?? node.content).trim())
                 }
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {editPendingPostId === node.id ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -759,7 +767,7 @@ function CommentTreeNode({
                 className="rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-3"
               >
                 <p className="text-xs text-[color:var(--muted-foreground)]">
-                  Version {node.edits.length - index} • {formatDateTime(edit.editedAt)}
+                  Version {node.edits.length - index} â€¢ {formatDateTime(edit.editedAt)}
                 </p>
                 <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--foreground)]">
                   {edit.content}
@@ -913,11 +921,11 @@ function CommentTreeNode({
             maxLength={500}
             className="mt-3 w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-amber-500/45 focus:ring-2 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-[color:var(--muted-foreground)]">
               {(reportDrafts[node.id] || "").trim().length}/500 characters
             </span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={() => {
@@ -925,7 +933,7 @@ function CommentTreeNode({
                   setReportingPostId(null);
                 }}
                 disabled={reportPendingPostId === node.id}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 Cancel
               </button>
@@ -936,7 +944,7 @@ function CommentTreeNode({
                   reportPendingPostId === node.id ||
                   !(reportDrafts[node.id] || "").trim()
                 }
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {reportPendingPostId === node.id ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -966,16 +974,16 @@ function CommentTreeNode({
             className="w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-sky-500/45 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-[color:var(--muted-foreground)]">
               {(replyDrafts[node.id] || "").trim().length}/10000 characters
             </span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={() => setReplyParentId(null)}
                 disabled={replyPendingParentId === node.id}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 Cancel
               </button>
@@ -988,7 +996,7 @@ function CommentTreeNode({
                   replyPendingParentId === node.id ||
                   !(replyDrafts[node.id] || "").trim()
                 }
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {replyPendingParentId === node.id ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1034,8 +1042,8 @@ function CommentTreeNode({
         className="absolute w-px bg-[color:var(--surface-border)] opacity-90"
         style={{
           left: `${guideLeftPx}px`,
-          top: `${-THREAD_BRANCH_GAP_PX}px`,
-          bottom: `${-THREAD_BRANCH_GAP_PX}px`,
+          top: `${-branchGapPx}px`,
+          bottom: `${-branchGapPx}px`,
         }}
       />
       <span
@@ -1126,6 +1134,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
   const [pollOptionDrafts, setPollOptionDrafts] = useState<string[]>([]);
   const [pollActionPending, setPollActionPending] = useState(false);
   const [pollActionError, setPollActionError] = useState<string | null>(null);
+  const [compactThreadLayout, setCompactThreadLayout] = useState(false);
   const numericThreadId = Number(threadId);
   const canUseReaderAiTools = session?.user?.role === "USER";
   const visiblePosts = useMemo(() => {
@@ -1205,6 +1214,21 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
 
     window.addEventListener(AUTH_CHANGED_EVENT, syncSession);
     return () => window.removeEventListener(AUTH_CHANGED_EVENT, syncSession);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const syncLayout = () => setCompactThreadLayout(mediaQuery.matches);
+
+    syncLayout();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncLayout);
+      return () => mediaQuery.removeEventListener("change", syncLayout);
+    }
+
+    mediaQuery.addListener(syncLayout);
+    return () => mediaQuery.removeListener(syncLayout);
   }, []);
 
   useEffect(() => {
@@ -2134,7 +2158,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
         {backLabel}
       </Link>
 
-      <article className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_8px_22px_rgba(2,8,23,0.06)]">
+      <article className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <ThreadTypeBadge type={thread.type} />
           {closedMatchThread && (
@@ -2183,11 +2207,11 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-[color:var(--muted-foreground)]">
                 {threadBodyDraft.trim().length}/10000 characters
               </span>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <button
                   type="button"
                   onClick={() => {
@@ -2195,7 +2219,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     setThreadActionError(null);
                   }}
                   disabled={threadActionPending}
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -2207,7 +2231,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     !threadTitleDraft.trim() ||
                     !threadBodyDraft.trim()
                   }
-                  className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {threadActionPending ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2220,12 +2244,12 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             </div>
           </div>
         ) : (
-          <h1 className="mt-3 text-3xl font-bold text-[color:var(--foreground)]">
+          <h1 className="mt-3 break-words text-2xl font-bold text-[color:var(--foreground)] sm:text-3xl">
             {displayedThreadTitle}
           </h1>
         )}
 
-        <div className="mt-3 flex items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
           {threadAuthorProfileHref ? (
             <Link
               href={threadAuthorProfileHref}
@@ -2238,7 +2262,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             <Avatar author={thread.author} />
           )}
           {threadAuthorProfileHref ? (
-            <span>
+            <span className="min-w-0 break-words">
               by{" "}
               <Link
                 href={threadAuthorProfileHref}
@@ -2248,7 +2272,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               </Link>
             </span>
           ) : (
-            <span>by {thread.author.username}</span>
+            <span className="min-w-0 break-words">by {thread.author.username}</span>
           )}
           {systemAuthor && (
             <span className="inline-flex items-center rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-600">
@@ -2263,9 +2287,16 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
 
         {thread.match && (
           <div className="mt-4 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-            Match status: <span className="font-semibold text-[color:var(--foreground)]">{thread.match.status}</span>
-            <span className="mx-2 opacity-60">|</span>
-            Kickoff: {formatDateTime(thread.match.utcDate)}
+            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center">
+              <span>
+                Match status:{" "}
+                <span className="font-semibold text-[color:var(--foreground)]">
+                  {thread.match.status}
+                </span>
+              </span>
+              <span className="hidden opacity-60 sm:inline">|</span>
+              <span>Kickoff: {formatDateTime(thread.match.utcDate)}</span>
+            </div>
           </div>
         )}
 
@@ -2281,7 +2312,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             <p className="mt-1">
               Opened {formatDateTime(thread.openAt)}
               {thread.closedAt
-                ? ` · ${closedMatchThread ? "Closed" : "Closes"} ${formatDateTime(thread.closedAt)}`
+                ? ` • ${closedMatchThread ? "Closed" : "Closes"} ${formatDateTime(thread.closedAt)}`
                 : ""}
             </p>
           </div>
@@ -2293,7 +2324,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               type="button"
               onClick={() => void handleToggleMatchSentiment()}
               disabled={matchSentimentPending}
-              className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {matchSentimentPending ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2315,7 +2346,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
                 Overall Mood
               </p>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${sentimentPillClass(matchSentiment.overall)}`}
                 >
@@ -2331,7 +2362,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
                 {matchSentiment.homeTeam.name}
               </p>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${sentimentPillClass(matchSentiment.homeTeam.sentiment)}`}
                 >
@@ -2349,7 +2380,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
                 {matchSentiment.awayTeam.name}
               </p>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${sentimentPillClass(matchSentiment.awayTeam.sentiment)}`}
                 >
@@ -2377,7 +2408,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
               type="button"
               onClick={() => void handleToggleThreadTranslation(thread.title, thread.body)}
               disabled={threadTranslationPending}
-              className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {threadTranslationPending ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2419,8 +2450,8 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                 : "border-amber-500/25 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(255,255,255,0.65))]"
             }`}
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">
                   Thread Poll
                 </p>
@@ -2454,7 +2485,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <label className="text-sm font-medium text-[color:var(--foreground)]">
                           Poll options
                         </label>
@@ -2503,7 +2534,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                           type="button"
                           onClick={() => setPollOptionDrafts((current) => [...current, ""])}
                           disabled={pollActionPending}
-                          className="mt-3 btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                          className="mt-3 btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
                           <Plus className="h-4 w-4" />
                           Add option
@@ -2541,13 +2572,13 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
                 {canEditPoll && !editingPoll && (
                   <button
                     type="button"
                     onClick={handleStartPollEdit}
                     disabled={pollActionPending}
-                    className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     <Pencil className="h-4 w-4" />
                     Edit poll
@@ -2558,7 +2589,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     type="button"
                     onClick={() => void handleDeletePoll()}
                     disabled={pollActionPending}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     {pollActionPending ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2579,7 +2610,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                       setShowPollReportForm((current) => !current);
                     }}
                     disabled={pollReportPending}
-                    className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 transition hover:border-amber-500/45 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 transition hover:border-amber-500/45 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     {pollReportPending ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2599,7 +2630,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             )}
 
             {editingPoll && (
-              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -2607,7 +2638,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     setPollActionError(null);
                   }}
                   disabled={pollActionPending}
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -2615,7 +2646,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                   type="button"
                   onClick={() => void handleSavePollEdit()}
                   disabled={pollActionPending}
-                  className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {pollActionPending ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2664,8 +2695,8 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                         : "border-[color:var(--surface-border)]"
                     }`}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-[color:var(--foreground)]">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <span className="break-words text-sm font-medium text-[color:var(--foreground)]">
                         {translatedThread?.pollOptions[index]?.trim()
                           ? translatedThread.pollOptions[index]
                           : option.text}
@@ -2673,7 +2704,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-[color:var(--muted-foreground)]">
                           {option._count.votes} vote{option._count.votes === 1 ? "" : "s"}
-                          {pollTotalVotes > 0 ? ` · ${percentage}%` : ""}
+                          {pollTotalVotes > 0 ? ` • ${percentage}%` : ""}
                         </span>
                         {isVotedOption && (
                           <span className="inline-flex items-center rounded-full border border-sky-500/35 bg-sky-500/12 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-sky-600">
@@ -2690,7 +2721,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                             type="button"
                             onClick={() => void handlePollVote(option.id)}
                             disabled={Boolean(pollVotePendingOptionId) || isVotedOption}
-                            className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-700 transition hover:border-sky-500/45 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-700 transition hover:border-sky-500/45 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                           >
                             {votePending ? (
                               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -2722,9 +2753,9 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             )}
 
             {!session?.user && pollIsOpen && (
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+              <div className="mt-4 flex flex-col gap-2 text-sm text-[color:var(--muted-foreground)] sm:flex-row sm:flex-wrap sm:items-center">
                 <span>Sign in to vote in this poll.</span>
-                <Link href={loginHref} className="btn-secondary">
+                <Link href={loginHref} className="btn-secondary w-full justify-center sm:w-auto">
                   <LogIn className="h-4 w-4" />
                   Login
                 </Link>
@@ -2756,11 +2787,11 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                   maxLength={500}
                   className="mt-3 w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-amber-500/45 focus:ring-2 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs text-[color:var(--muted-foreground)]">
                     {pollReportDraft.trim().length}/500 characters
                   </span>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                       type="button"
                       onClick={() => {
@@ -2768,7 +2799,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                         setShowPollReportForm(false);
                       }}
                       disabled={pollReportPending}
-                      className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                      className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       Cancel
                     </button>
@@ -2776,7 +2807,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                       type="button"
                       onClick={() => void handlePollReportSubmit()}
                       disabled={pollReportPending || !pollReportDraft.trim()}
-                      className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       {pollReportPending ? (
                         <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2808,12 +2839,12 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
 
         {canManageThread && !editingThread && (
           <div className="mt-5 flex justify-end">
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={handleStartThreadEdit}
                 disabled={threadActionPending}
-                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <MessageSquare className="h-4 w-4" />
                 Edit thread
@@ -2822,7 +2853,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                 type="button"
                 onClick={() => void handleDeleteThread()}
                 disabled={threadActionPending}
-                className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 {threadActionPending ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -2837,14 +2868,14 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
       </article>
 
       {!singleCommentView && (
-        <section className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_8px_22px_rgba(2,8,23,0.06)]">
+        <section className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] sm:p-5">
           {availability.closed ? (
             <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-[color:var(--foreground)]">
               This thread is closed, so new posts and replies are disabled.
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-[color:var(--foreground)]">Join the Thread</h2>
                   <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
@@ -2856,12 +2887,12 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     Posting as <span className="font-semibold text-[color:var(--foreground)]">{session.user.username}</span>
                   </span>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href={loginHref} className="btn-secondary">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                    <Link href={loginHref} className="btn-secondary w-full justify-center sm:w-auto">
                       <LogIn className="h-4 w-4" />
                       Login
                     </Link>
-                    <Link href="/register" className="btn-primary">
+                    <Link href="/register" className="btn-primary w-full justify-center sm:w-auto">
                       Create Account
                     </Link>
                   </div>
@@ -2896,7 +2927,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                   className="min-h-[120px] w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-sky-500/45 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                 />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs text-[color:var(--muted-foreground)]">
                     {composerContent.trim().length}/10000 characters
                   </span>
@@ -2904,7 +2935,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
                     type="button"
                     onClick={handleComposerSubmit}
                     disabled={!session || !availability.canPost || composerPending || !composerContent.trim()}
-                    className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     {composerPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     {composerPending ? "Posting..." : "Post to Thread"}
@@ -2926,7 +2957,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
         {singleCommentView && highlightedPostId && (
           <div
             id="single-comment-thread"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3"
+            className="flex flex-col gap-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
           >
             <div>
               <p className="text-sm font-semibold text-[color:var(--foreground)]">Single comment thread</p>
@@ -2946,8 +2977,8 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
         {!singleCommentView && (
           <div className="space-y-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3">
             {!showingSearchResults && (
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <label className="flex flex-col gap-2 text-sm text-[color:var(--muted-foreground)] sm:flex-row sm:items-center">
                   <span>Sort by</span>
                   <select
                     value={commentSort}
@@ -2963,7 +2994,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             )}
 
             <form onSubmit={handleCommentSearchSubmit}>
-              <label className="flex min-w-[240px] items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-2 text-sm text-[color:var(--muted-foreground)]">
+              <label className="flex w-full min-w-0 items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-2 text-sm text-[color:var(--muted-foreground)]">
                 <Search className="h-4 w-4" />
                 <input
                   type="search"
@@ -3031,6 +3062,7 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
             key={post.id}
             node={post}
             depth={0}
+            compactLayout={compactThreadLayout}
             highlightedPostId={highlightedPostId}
             collapsedPosts={collapsedPosts}
             toggleCollapsedPost={toggleCollapsedPost}
@@ -3118,3 +3150,5 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
     </section>
   );
 }
+
+

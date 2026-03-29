@@ -44,26 +44,38 @@ export default function NotificationListItem({
         </span>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <p className={`min-w-0 truncate font-semibold text-[color:var(--foreground)] ${compact ? "text-sm" : "text-base"}`}>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <p
+              className={`min-w-0 break-words font-semibold text-[color:var(--foreground)] ${
+                compact ? "text-sm" : "text-sm sm:text-base"
+              }`}
+            >
               {item.title}
             </p>
-            <span className="shrink-0 text-xs text-[color:var(--muted-foreground)]">
+            <span className="shrink-0 text-[11px] text-[color:var(--muted-foreground)] sm:text-xs">
               {item.timestampLabel}
             </span>
           </div>
 
-          <p className={`mt-1 text-[color:var(--muted-foreground)] ${compact ? "line-clamp-1 text-xs" : "line-clamp-2 text-sm"}`}>
+          <p
+            className={`mt-1 text-[color:var(--muted-foreground)] ${
+              compact ? "line-clamp-1 text-xs" : "line-clamp-2 text-sm"
+            }`}
+          >
             {item.summary}
           </p>
 
-          <p className={`mt-2 text-[color:var(--muted-foreground)] ${compact ? "text-xs" : "text-sm"}`}>
+          <p
+            className={`mt-2 break-words text-[color:var(--muted-foreground)] ${
+              compact ? "text-xs" : "text-xs sm:text-sm"
+            }`}
+          >
             {item.context}
           </p>
         </div>
 
         {!compact && (
-          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--muted-foreground)] transition group-hover:text-sky-500" />
+          <ChevronRight className="mt-1 hidden h-4 w-4 shrink-0 text-[color:var(--muted-foreground)] transition group-hover:text-sky-500 sm:block" />
         )}
       </div>
     </Link>

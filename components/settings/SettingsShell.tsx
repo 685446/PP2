@@ -1548,10 +1548,10 @@ export default function SettingsShell() {
       </header>
 
       <div className="grid gap-4 md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="self-start rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-3 shadow-[0_8px_22px_rgba(2,8,23,0.08)] lg:sticky lg:top-24">
+        <aside className="self-start overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-3 shadow-[0_8px_22px_rgba(2,8,23,0.08)] lg:sticky lg:top-24">
           <nav
             aria-label="Settings tabs"
-            className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-1"
+            className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] lg:grid lg:grid-cols-1 lg:overflow-visible lg:pb-0"
           >
             {tabs.map((tab) => {
               const active = tab.key === activeTab;
@@ -1560,7 +1560,7 @@ export default function SettingsShell() {
                   key={tab.key}
                   href={`${pathname}?tab=${tab.key}`}
                   aria-current={active ? "page" : undefined}
-                  className={`min-w-0 rounded-xl border px-3 py-2.5 transition ${INTERACTIVE_FOCUS_RING} ${
+                  className={`min-w-[148px] shrink-0 rounded-xl border px-3 py-2.5 transition sm:min-w-[168px] lg:min-w-0 lg:shrink ${INTERACTIVE_FOCUS_RING} ${
                     active
                       ? "border-sky-500/35 bg-sky-500/15 text-[color:var(--foreground)]"
                       : "border-transparent bg-transparent text-[color:var(--muted-foreground)] hover:border-[color:var(--surface-border)] hover:bg-[color:var(--surface-elevated)] hover:text-[color:var(--foreground)]"
@@ -1721,22 +1721,22 @@ export default function SettingsShell() {
                         Avatar
                       </label>
 
-                      <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-3 sm:p-4">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                          <img
-                            src={avatarPreviewCurrentSrc}
-                            alt="Avatar preview"
-                            className="h-20 w-20 rounded-2xl border border-[color:var(--surface-border)] object-cover shadow-sm"
-                            onError={() => {
-                              if (avatarPreviewCurrentSrc !== "/avatars/default1.png") {
-                                setAvatarPreviewCurrentSrc("/avatars/default1.png");
-                              }
-                            }}
-                          />
+                        <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-3 sm:p-4">
+                          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                            <img
+                              src={avatarPreviewCurrentSrc}
+                              alt="Avatar preview"
+                              className="h-24 w-24 rounded-3xl border border-[color:var(--surface-border)] object-cover shadow-sm sm:h-20 sm:w-20 sm:rounded-2xl"
+                              onError={() => {
+                                if (avatarPreviewCurrentSrc !== "/avatars/default1.png") {
+                                  setAvatarPreviewCurrentSrc("/avatars/default1.png");
+                                }
+                              }}
+                            />
 
-                          <div className="min-w-0 flex-1 space-y-3">
-                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                              {DEFAULT_AVATARS.map((avatarPath) => {
+                            <div className="w-full min-w-0 flex-1 space-y-3">
+                              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                                {DEFAULT_AVATARS.map((avatarPath) => {
                                 const selected =
                                   profileValues.avatar.trim() === avatarPath;
                                 return (
@@ -1765,10 +1765,10 @@ export default function SettingsShell() {
                               })}
                             </div>
 
-                            <div>
+                            <div className="text-center sm:text-left">
                               <label
                                 htmlFor="profile-avatar-upload"
-                                className={`inline-flex cursor-pointer items-center rounded-lg border px-3 py-2 text-xs font-semibold transition ${INTERACTIVE_FOCUS_RING} ${
+                                className={`inline-flex w-full cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition sm:w-auto ${INTERACTIVE_FOCUS_RING} ${
                                   avatarUploadState === "uploading"
                                     ? "border-[color:var(--surface-border)] bg-[color:var(--surface)] text-[color:var(--foreground)]"
                                     : isLightTheme
@@ -1966,7 +1966,7 @@ export default function SettingsShell() {
                       </p>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                       <label className="space-y-1 text-sm">
                         <span className="font-semibold text-[color:var(--foreground)]">Status</span>
                         <select
@@ -2247,14 +2247,14 @@ export default function SettingsShell() {
                                   </div>
                                 </div>
 
-                                <div className="flex min-w-[220px] flex-col gap-2">
+                                <div className="flex w-full min-w-0 flex-col gap-2 lg:min-w-[220px] lg:max-w-[260px]">
                                   {userProfileHref && (
-                                    <Link href={userProfileHref} className={`btn-secondary justify-center ${INTERACTIVE_FOCUS_RING}`}>
+                                    <Link href={userProfileHref} className={`btn-secondary w-full justify-center ${INTERACTIVE_FOCUS_RING}`}>
                                       View user profile
                                     </Link>
                                   )}
                                   {threadHref && (
-                                    <Link href={threadHref} className={`btn-secondary justify-center ${INTERACTIVE_FOCUS_RING}`}>
+                                    <Link href={threadHref} className={`btn-secondary w-full justify-center ${INTERACTIVE_FOCUS_RING}`}>
                                       Open thread
                                     </Link>
                                   )}
@@ -2263,7 +2263,7 @@ export default function SettingsShell() {
                                       <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--muted-foreground)]">
                                         Suspension length
                                       </label>
-                                      <div className="mt-2 flex items-center gap-2">
+                                      <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                                         <input
                                           type="number"
                                           inputMode="numeric"
@@ -2280,7 +2280,7 @@ export default function SettingsShell() {
                                           disabled={reportsActionKey !== null}
                                           className="w-full rounded-lg border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--foreground)]"
                                         />
-                                        <span className="text-sm text-[color:var(--muted-foreground)]">
+                                        <span className="text-sm text-[color:var(--muted-foreground)] sm:shrink-0">
                                           days
                                         </span>
                                       </div>
@@ -2326,7 +2326,7 @@ export default function SettingsShell() {
                                               !moderationReasonValid ||
                                               !reportSuspensionDaysValid
                                             }
-                                            className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                            className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                           >
                                             {reportsActionKey === `moderate:suspend:${report.id}`
                                               ? "Suspending..."
@@ -2346,7 +2346,7 @@ export default function SettingsShell() {
                                             disabled={
                                               reportsActionKey !== null || !moderationReasonValid
                                             }
-                                            className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                            className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                           >
                                             {reportsActionKey === `moderate:ban:${report.id}`
                                               ? "Banning..."
@@ -2360,7 +2360,7 @@ export default function SettingsShell() {
                                               void runUserModerationAction(report, "unban")
                                             }
                                             disabled={reportsActionKey !== null}
-                                            className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                            className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                           >
                                             {reportsActionKey === `moderate:unban:${report.id}`
                                               ? "Lifting..."
@@ -2387,7 +2387,7 @@ export default function SettingsShell() {
                                           reportsActionKey !== null ||
                                           (canChooseUserSuspension && !reportSuspensionDaysValid)
                                         }
-                                        className={`btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                        className={`btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                       >
                                         {reportsActionKey === `approve:${report.id}`
                                           ? "Approving..."
@@ -2401,7 +2401,7 @@ export default function SettingsShell() {
                                         type="button"
                                         onClick={() => void runReportAction(report.id, "dismiss")}
                                         disabled={reportsActionKey !== null}
-                                        className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                        className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                       >
                                         {reportsActionKey === `dismiss:${report.id}` ? "Rejecting..." : "Reject report"}
                                       </button>
@@ -2414,7 +2414,7 @@ export default function SettingsShell() {
                                             })
                                           }
                                           disabled={reportsActionKey !== null}
-                                          className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                          className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                         >
                                           {reportsActionKey === `dismiss:${report.id}`
                                             ? "Rejecting..."
@@ -2446,7 +2446,7 @@ export default function SettingsShell() {
                       </p>
                     </div>
 
-                    <label className="block max-w-xs space-y-1 text-sm">
+                    <label className="block max-w-full space-y-1 text-sm sm:max-w-xs">
                       <span className="font-semibold text-[color:var(--foreground)]">Appeal status</span>
                       <select
                         value={appealsStatus}
@@ -2521,14 +2521,14 @@ export default function SettingsShell() {
                                 </div>
                               </div>
 
-                              <div className="flex min-w-[220px] flex-col gap-2">
+                              <div className="flex w-full min-w-0 flex-col gap-2 lg:min-w-[220px] lg:max-w-[260px]">
                                 {appeal.status === "PENDING" ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={() => void runAppealAction(appeal.id, "approve")}
                                       disabled={appealsActionKey !== null}
-                                      className={`btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                      className={`btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                     >
                                       {appealsActionKey === `approve:${appeal.id}` ? "Approving..." : "Approve appeal"}
                                     </button>
@@ -2536,7 +2536,7 @@ export default function SettingsShell() {
                                       type="button"
                                       onClick={() => void runAppealAction(appeal.id, "reject")}
                                       disabled={appealsActionKey !== null}
-                                      className={`btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                                      className={`btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
                                     >
                                       {appealsActionKey === `reject:${appeal.id}` ? "Rejecting..." : "Reject appeal"}
                                     </button>
@@ -2672,12 +2672,12 @@ export default function SettingsShell() {
                     </p>
                   )}
 
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={appealSaveState === "saving"}
-                      className={`btn-primary h-10 rounded-lg px-4 disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
-                    >
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={appealSaveState === "saving"}
+                          className={`btn-primary h-10 w-full rounded-lg px-4 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${INTERACTIVE_FOCUS_RING}`}
+                        >
                       {appealSaveState === "saving" ? "Submitting..." : "Submit appeal"}
                     </button>
                   </div>
@@ -2846,7 +2846,7 @@ export default function SettingsShell() {
                     <button
                       type="submit"
                       disabled={accountSaveState === "saving"}
-                      className={`btn-primary h-10 rounded-lg px-4 disabled:cursor-not-allowed disabled:opacity-60 ${INTERACTIVE_FOCUS_RING}`}
+                      className={`btn-primary h-10 w-full rounded-lg px-4 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${INTERACTIVE_FOCUS_RING}`}
                     >
                       {accountSaveState === "saving"
                         ? "Updating..."

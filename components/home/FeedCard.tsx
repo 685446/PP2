@@ -28,7 +28,7 @@ function PostRelationLine({ item }: { item: HomeFeedItem }) {
       : `In ${item.postRelation.label}`;
 
   return (
-    <div className="inline-flex max-w-full items-center gap-1.5 text-xs font-medium text-sky-500/90">
+    <div className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-xs font-medium text-sky-500/90">
       <CornerDownRight className="h-3.5 w-3.5 shrink-0 opacity-80" />
       <span className="truncate">{relationText}</span>
     </div>
@@ -88,7 +88,7 @@ function GenericFeedCard({ item }: FeedCardProps) {
       href={item.href}
       ariaLabel={`${item.title}. ${item.summary}`}
       headerLeft={
-        <div className="inline-flex flex-wrap items-center gap-2">
+        <div className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-xs font-semibold text-sky-500">
             <FeedTypeIcon type={item.type} />
             <FeedTypeLabel type={item.type} />
@@ -138,7 +138,7 @@ function FollowingFeedCard({ item }: FeedCardProps) {
       href={item.href}
       ariaLabel={`${item.title}. ${item.summary}`}
       headerLeft={
-        <div className="inline-flex items-center gap-2">
+        <div className="inline-flex max-w-full min-w-0 items-center gap-2">
           {actorAvatar ? (
             <span
               className={`inline-flex h-8 w-8 items-center justify-center rounded-full ring-1 ring-[color:var(--surface-border)] ${
@@ -158,8 +158,8 @@ function FollowingFeedCard({ item }: FeedCardProps) {
               {avatarFallback}
             </span>
           )}
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-[color:var(--foreground)]">{actorName}</p>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">{actorName}</p>
             <p className="text-xs text-[color:var(--muted-foreground)]">Following</p>
           </div>
         </div>

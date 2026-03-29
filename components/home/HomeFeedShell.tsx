@@ -124,6 +124,7 @@ const INITIAL_DIGEST_STATE: DigestState = {
 };
 
 const INITIAL_HOME_COMPOSER_STATE: HomeComposerState = INITIAL_THREAD_COMPOSER_CORE_STATE;
+const MOBILE_TEAM_HUB_PULL_CLOSE_THRESHOLD = 72;
 
 type HomeActivityFilterValue = FeedItemType | "posts";
 
@@ -754,6 +755,7 @@ export default function HomeFeedShell() {
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<HomeActivityFilterValue[]>(HOME_ALL_ACTIVITY_TYPES);
   const [composerOpen, setComposerOpen] = useState(false);
   const [mobilePanelsOpen, setMobilePanelsOpen] = useState(false);
+  const [mobilePanelsPullOffset, setMobilePanelsPullOffset] = useState(0);
   const [composerPending, setComposerPending] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [composer, setComposer] = useState<HomeComposerState>({
@@ -764,6 +766,10 @@ export default function HomeFeedShell() {
   const [digestPollTick, setDigestPollTick] = useState(0);
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
   const activityMenuRef = useRef<HTMLDivElement | null>(null);
+  const mobilePanelsScrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileSheetTouchStartYRef = useRef<number | null>(null);
+  const mobileSheetCanCloseOnPullRef = useRef(false);
+  const mobileSheetAccumulatedPullRef = useRef(0);
 
   useEffect(() => {
     const syncSession = () => {
@@ -1098,6 +1104,7 @@ export default function HomeFeedShell() {
   useEffect(() => {
     if (!mobilePanelsOpen) return;
 
+    setMobilePanelsPullOffset(0);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -1113,6 +1120,59 @@ export default function HomeFeedShell() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [mobilePanelsOpen]);
+
+  const handleMobilePanelsTouchStart = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const scrollContainer = mobilePanelsScrollRef.current;
+      mobileSheetTouchStartYRef.current = event.touches[0]?.clientY ?? null;
+      mobileSheetAccumulatedPullRef.current = 0;
+      mobileSheetCanCloseOnPullRef.current = Boolean(
+        scrollContainer && scrollContainer.scrollTop <= 0
+      );
+      setMobilePanelsPullOffset(0);
+    },
+    []
+  );
+
+  const handleMobilePanelsTouchMove = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      if (!mobileSheetCanCloseOnPullRef.current) return;
+
+      const startY = mobileSheetTouchStartYRef.current;
+      const currentY = event.touches[0]?.clientY;
+      const scrollContainer = mobilePanelsScrollRef.current;
+
+      if (startY === null || currentY === undefined || !scrollContainer) return;
+
+      if (scrollContainer.scrollTop > 0) {
+        mobileSheetCanCloseOnPullRef.current = false;
+        mobileSheetAccumulatedPullRef.current = 0;
+        setMobilePanelsPullOffset(0);
+        return;
+      }
+
+      const deltaY = currentY - startY;
+      const pullDistance = deltaY > 0 ? deltaY : 0;
+      mobileSheetAccumulatedPullRef.current = pullDistance;
+      setMobilePanelsPullOffset(Math.min(pullDistance * 0.45, 96));
+    },
+    []
+  );
+
+  const handleMobilePanelsTouchEnd = useCallback(() => {
+    const shouldClose =
+      mobileSheetCanCloseOnPullRef.current &&
+      mobileSheetAccumulatedPullRef.current >= MOBILE_TEAM_HUB_PULL_CLOSE_THRESHOLD;
+
+    mobileSheetTouchStartYRef.current = null;
+    mobileSheetCanCloseOnPullRef.current = false;
+    mobileSheetAccumulatedPullRef.current = 0;
+    setMobilePanelsPullOffset(0);
+
+    if (shouldClose) {
+      setMobilePanelsOpen(false);
+    }
+  }, []);
 
   const sortedItems = useMemo(
     () => [...feedState.items].sort((a, b) => b.createdAtMs - a.createdAtMs),
@@ -1452,7 +1512,14 @@ export default function HomeFeedShell() {
 
       {mobilePanelsOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/45 xl:hidden"
+          className="fixed inset-0 z-50 xl:hidden"
+          style={{
+            backgroundColor: `rgba(0, 0, 0, ${Math.max(
+              0.22,
+              0.45 - mobilePanelsPullOffset / 260
+            )})`,
+            transition: mobilePanelsPullOffset > 0 ? "none" : "background-color 180ms ease",
+          }}
           onClick={() => setMobilePanelsOpen(false)}
         >
           <div
@@ -1460,9 +1527,13 @@ export default function HomeFeedShell() {
             aria-modal="true"
             aria-label="Team hub"
             onClick={(event) => event.stopPropagation()}
-            className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-hidden rounded-t-[28px] border border-b-0 border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_-18px_44px_rgba(2,8,23,0.35)]"
+            className="absolute inset-x-0 bottom-0 flex max-h-[calc(100dvh-5rem)] flex-col overflow-hidden rounded-t-[28px] border border-b-0 border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_-18px_44px_rgba(2,8,23,0.35)]"
+            style={{
+              transform: `translateY(${mobilePanelsPullOffset}px)`,
+              transition: mobilePanelsPullOffset > 0 ? "none" : "transform 220ms ease",
+            }}
           >
-            <div className="flex items-center justify-between border-b border-[color:var(--surface-border)] px-5 py-4">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[color:var(--surface-border)] bg-[color:var(--surface)] px-5 py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">Team Hub</p>
                 <h2 className="mt-1 text-lg font-bold text-[color:var(--foreground)]">
@@ -1479,7 +1550,14 @@ export default function HomeFeedShell() {
               </button>
             </div>
 
-            <div className="max-h-[calc(78vh-78px)] overflow-y-auto px-4 pb-6 pt-4">
+            <div
+              ref={mobilePanelsScrollRef}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(env(safe-area-inset-bottom),1.5rem)] pt-4"
+              onTouchStart={handleMobilePanelsTouchStart}
+              onTouchMove={handleMobilePanelsTouchMove}
+              onTouchEnd={handleMobilePanelsTouchEnd}
+              onTouchCancel={handleMobilePanelsTouchEnd}
+            >
               <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[color:var(--surface-border)]" />
               <HomeSidebarContent
                 session={session}

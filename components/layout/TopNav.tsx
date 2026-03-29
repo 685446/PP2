@@ -68,6 +68,11 @@ export default function TopNav({
   onLogout,
 }: TopNavProps) {
   const guestItems = getVisibleItems(GUEST_NAV_ITEMS, auth);
+  const guestPrimaryItem =
+    guestItems.find((item) => item.label === "Login") ?? guestItems[0] ?? null;
+  const guestSecondaryItems = guestItems.filter(
+    (item) => !guestPrimaryItem || item.href !== guestPrimaryItem.href
+  );
   const canSeeNotifications = getVisibleItems([TOP_NAV_NOTIFICATION_ITEM], auth).length > 0;
   const systemIdentity = isSystemIdentity({
     username: auth.username,
@@ -249,12 +254,12 @@ export default function TopNav({
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--nav-border)] bg-[color:var(--nav-bg)] text-[color:var(--nav-text)] shadow-[0_4px_18px_rgba(2,8,23,0.08)] backdrop-blur">
-      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2">
+      <div className="flex h-[3.75rem] w-full items-center justify-between gap-2 px-2.5 sm:h-16 sm:gap-2.5 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={onSidebarToggle}
-            className="btn-icon-lg"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)]/95 text-[color:var(--foreground)] shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/35 [html[data-theme='dark']_&]:border-[color:var(--nav-border)] [html[data-theme='dark']_&]:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:shadow-[0_8px_20px_rgba(0,0,0,0.24)] [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-hover)] lg:h-10 lg:w-10 lg:rounded-xl lg:shadow-none"
             aria-label={sidebarCollapsed ? "Expand navigation menu" : "Collapse navigation menu"}
           >
             <Menu className="h-6 w-6 lg:hidden" strokeWidth={2.25} />
@@ -265,14 +270,14 @@ export default function TopNav({
             )}
           </button>
 
-          <Link href="/" className="inline-flex items-center gap-2.5">
-            <span className="brand-logo-stack h-6 w-6">
+          <Link href="/" className="inline-flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+            <span className="brand-logo-stack h-5 w-5 shrink-0 sm:h-6 sm:w-6">
               <Image
                 src="/branding/logo_icon_white.svg"
                 alt="SportsDeck logo"
                 width={24}
                 height={22}
-                className="brand-logo-dark h-6 w-auto"
+                className="brand-logo-dark h-5 w-auto sm:h-6"
                 priority
               />
               <Image
@@ -280,24 +285,36 @@ export default function TopNav({
                 alt="SportsDeck logo"
                 width={24}
                 height={22}
-                className="brand-logo-light h-6 w-auto"
+                className="brand-logo-light h-5 w-auto sm:h-6"
                 priority
               />
             </span>
-            <span className="text-base font-extrabold uppercase leading-none tracking-[0.01em] sm:text-lg">
+            <span className="truncate text-[13px] font-extrabold uppercase leading-none tracking-[0.005em] sm:text-lg">
               <span className="text-[color:var(--nav-text)]">Sports</span>
               <span className="text-sky-300">Deck</span>
             </span>
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+          {!auth.isAuthenticated && guestPrimaryItem && (
+            <Link
+              href={guestPrimaryItem.href}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[color:var(--btn-primary-bg)] px-3 text-sm font-semibold text-[color:var(--btn-primary-text)] transition hover:bg-[color:var(--btn-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 sm:h-10 sm:px-4"
+            >
+              <GuestIcon label={guestPrimaryItem.label} />
+              {guestPrimaryItem.label}
+            </Link>
+          )}
+
           {!auth.isAuthenticated &&
-            guestItems.map((item) => (
+            guestSecondaryItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={item.label === "Login" ? "btn-primary" : "btn-secondary"}
+                className={`btn-secondary hidden sm:inline-flex ${
+                  item.label === "Register" ? "sm:px-4" : ""
+                }`}
               >
                 <GuestIcon label={item.label} />
                 {item.label}
@@ -324,7 +341,7 @@ export default function TopNav({
                 aria-expanded={isNotificationsOpen}
                 aria-haspopup="menu"
                 aria-label="Notifications"
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--nav-surface)] text-[color:var(--nav-text)] transition hover:bg-[color:var(--nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 [html[data-theme='dark']_&]:bg-transparent [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:focus-visible:bg-[color:var(--nav-surface)]"
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--nav-surface)] text-[color:var(--nav-text)] transition hover:bg-[color:var(--nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 sm:h-10 sm:w-10 [html[data-theme='dark']_&]:bg-transparent [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:focus-visible:bg-[color:var(--nav-surface)]"
               >
                 <Bell className="h-4 w-4" />
                 {notificationCount > 0 && (
@@ -335,7 +352,7 @@ export default function TopNav({
               </button>
 
               {isNotificationsOpen && (
-                <div className="fixed left-2 right-2 top-[4.5rem] z-[70] flex max-h-[calc(100dvh-5rem)] flex-col overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_18px_40px_rgba(2,8,23,0.28)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-auto sm:mt-2 sm:w-[22rem] sm:max-h-[min(70vh,28rem)] sm:max-w-[calc(100vw-1.5rem)]">
+                <div className="fixed left-2 right-2 top-[4.25rem] z-[70] flex max-h-[calc(100dvh-4.75rem)] flex-col overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_18px_40px_rgba(2,8,23,0.28)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-auto sm:mt-2 sm:w-[22rem] sm:max-h-[min(70vh,28rem)] sm:max-w-[calc(100vw-1.5rem)]">
                   <div className="flex items-center justify-between border-b border-[color:var(--surface-border)] px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-[color:var(--foreground)]">Notifications</p>
@@ -387,9 +404,9 @@ export default function TopNav({
                       )}
 
                     {notifications.items.length > 0 && (
-                      <div className="space-y-2">
-                        {notifications.items.map((item) => (
-                          <NotificationListItem
+                    <div className="space-y-2">
+                      {notifications.items.map((item) => (
+                        <NotificationListItem
                             key={item.id}
                             item={item}
                             compact
@@ -424,12 +441,12 @@ export default function TopNav({
                 }}
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
-                className="list-none cursor-pointer rounded-full bg-[color:var(--nav-surface)] pl-1.5 pr-3 text-sm font-semibold text-[color:var(--nav-text)] transition hover:bg-[color:var(--nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 [html[data-theme='dark']_&]:bg-transparent [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:focus-visible:bg-[color:var(--nav-surface)]"
+                className="list-none cursor-pointer rounded-full bg-[color:var(--nav-surface)] pl-0.5 pr-1 text-sm font-semibold text-[color:var(--nav-text)] transition hover:bg-[color:var(--nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 sm:pl-1.5 sm:pr-3 [html[data-theme='dark']_&]:bg-transparent [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:focus-visible:bg-[color:var(--nav-surface)]"
               >
-                <span className="inline-flex h-10 items-center gap-2.5">
+                <span className="inline-flex h-10 max-w-[10.5rem] items-center gap-1 sm:h-10 sm:max-w-[14rem] sm:gap-2.5">
                   {auth.avatar ? (
                     <span
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full ring-1 ring-[color:var(--nav-border)] ${
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-[color:var(--nav-border)] sm:h-8 sm:w-8 ${
                         systemIdentity ? "bg-white p-1" : ""
                       }`}
                     >
@@ -442,19 +459,19 @@ export default function TopNav({
                       />
                     </span>
                   ) : (
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--btn-secondary-bg)] text-[color:var(--nav-text)] ring-1 ring-[color:var(--nav-border)]">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--btn-secondary-bg)] text-[color:var(--nav-text)] ring-1 ring-[color:var(--nav-border)] sm:h-8 sm:w-8">
                       <User className="h-4 w-4" />
                     </span>
                   )}
-                  <span>{auth.username ?? "Account"}</span>
+                  <span className="hidden truncate sm:inline">{auth.username ?? "Account"}</span>
                   <ChevronDown
-                    className={`h-4 w-4 opacity-80 transition-transform ${isUserMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-3.5 w-3.5 shrink-0 opacity-75 transition-transform sm:h-4 sm:w-4 ${isUserMenuOpen ? "rotate-180" : ""}`}
                   />
                 </span>
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-[color:var(--nav-border)] bg-[color:var(--nav-surface)] shadow-[0_10px_22px_rgba(2,8,23,0.14)] backdrop-blur">
+                <div className="absolute right-0 mt-2 w-[min(11rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-[color:var(--nav-border)] bg-[color:var(--nav-surface)] shadow-[0_10px_22px_rgba(2,8,23,0.14)] backdrop-blur">
                   {USER_MENU_LINKS.map((item) => (
                     <Link
                       key={item.href}

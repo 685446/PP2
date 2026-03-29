@@ -147,6 +147,12 @@ function statusToBadgeLabel(status: string): string {
   return normalized;
 }
 
+function communityDisplayName(team: CommunityTeam | null, isGeneralCommunity: boolean) {
+  if (isGeneralCommunity) return "Premier League General";
+  if (!team) return "Team Community";
+  return team.shortName?.trim() || team.name;
+}
+
 
 function MatchThreadCard({
   thread,
@@ -554,24 +560,24 @@ export default function TeamCommunityShell({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/12 via-black/18 to-black/24 [html[data-theme='light']_&]:from-white/12 [html[data-theme='light']_&]:via-white/6 [html[data-theme='light']_&]:to-transparent" />
 
         <div className="relative flex flex-col gap-4 px-5 py-5 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href="/communities" className="btn-secondary inline-flex items-center gap-2 backdrop-blur-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+            <Link href="/communities" className="btn-secondary inline-flex w-full items-center justify-center gap-2 backdrop-blur-sm sm:w-auto sm:justify-start">
               <ArrowLeft className="h-4 w-4" />
               All Communities
             </Link>
             {isGeneralCommunity ? (
-              <Link href="/discussions" className="btn-secondary backdrop-blur-sm">
+              <Link href="/discussions" className="btn-secondary w-full justify-center backdrop-blur-sm sm:w-auto">
                 Open Discussions
               </Link>
             ) : team ? (
-              <Link href={`/teams/${team.id}`} className="btn-secondary backdrop-blur-sm">
+              <Link href={`/teams/${team.id}`} className="btn-secondary w-full justify-center backdrop-blur-sm sm:w-auto">
                 Open Team Page
               </Link>
             ) : null}
           </div>
 
           <div className="min-w-0 space-y-3">
-            <div className="flex min-w-0 items-center gap-4">
+            <div className="flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:items-center">
               {isGeneralCommunity ? (
                 <span className="inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/16 text-sky-100 backdrop-blur-sm [html[data-theme='light']_&]:border-sky-400/35 [html[data-theme='light']_&]:bg-white/72 [html[data-theme='light']_&]:text-sky-700">
                   <MessageSquare className="h-10 w-10" />
@@ -591,14 +597,10 @@ export default function TeamCommunityShell({
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300 [html[data-theme='light']_&]:text-sky-700">
                   Community
                 </p>
-                <h1 className="truncate text-[34px] font-black leading-[1.05] text-white [html[data-theme='light']_&]:text-slate-900">
-                  {isGeneralCommunity
-                    ? "Premier League General"
-                    : team
-                      ? `${team.name} Thread`
-                      : "Team Community"}
+                <h1 className="text-[30px] font-black leading-[1.05] text-white [html[data-theme='light']_&]:text-slate-900 sm:text-[34px]">
+                  {communityDisplayName(team, isGeneralCommunity)}
                 </h1>
-                <p className="truncate text-sm text-white/85 [html[data-theme='light']_&]:text-slate-700">
+                <p className="text-sm text-white/85 [html[data-theme='light']_&]:text-slate-700 sm:truncate">
                   {isGeneralCommunity
                     ? "League-wide discussion, opinions, and matchweek talk."
                     : team
@@ -633,7 +635,7 @@ export default function TeamCommunityShell({
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,760px)_320px] xl:justify-center">
         <div className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="inline-flex w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-1 md:w-auto">
+            <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-1 [scrollbar-width:none] [-ms-overflow-style:none] md:inline-flex md:w-auto md:overflow-visible">
               {filterOptions.map((option) => {
                 const active = typeFilter === option;
                 return (
@@ -641,7 +643,7 @@ export default function TeamCommunityShell({
                     key={option}
                     type="button"
                     onClick={() => setTypeFilter(option)}
-                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                       active
                         ? "bg-sky-500/15 text-sky-600"
                         : "text-[color:var(--muted-foreground)] hover:text-[color:var(--foreground)]"
@@ -841,7 +843,7 @@ export default function TeamCommunityShell({
 
       {composerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[1px]"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-0 backdrop-blur-[1px] sm:items-center sm:p-4"
           onClick={closeComposer}
         >
           <div
@@ -849,7 +851,7 @@ export default function TeamCommunityShell({
             aria-modal="true"
             aria-label={isGeneralCommunity ? "Create general thread" : "Create team thread"}
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_20px_52px_rgba(2,8,23,0.35)]"
+            className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_20px_52px_rgba(2,8,23,0.35)] sm:max-h-[86vh] sm:rounded-2xl"
           >
             <div className="flex items-center justify-between border-b border-[color:var(--surface-border)] px-5 py-4">
               <div>
@@ -875,17 +877,17 @@ export default function TeamCommunityShell({
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
               {!session ? (
                 <div className="space-y-3">
                   <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-4 text-sm text-[color:var(--foreground)]">
                     Sign in to create a thread in this community.
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Link href={loginHref} className="btn-primary">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <Link href={loginHref} className="btn-primary justify-center sm:justify-start">
                       Sign In
                     </Link>
-                    <Link href="/register" className="btn-secondary">
+                    <Link href="/register" className="btn-secondary justify-center sm:justify-start">
                       Create Account
                     </Link>
                   </div>

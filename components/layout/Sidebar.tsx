@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  GUEST_NAV_ITEMS,
   PRIMARY_NAV_ITEMS,
   SIDEBAR_MY_AREA_ITEMS,
   SIDEBAR_UTILITY_ITEMS,
@@ -98,12 +99,15 @@ function SidebarContent({
   auth,
   pathname,
   onNavigate,
+  showGuestAuthActions = false,
 }: {
   auth: AuthState;
   pathname: string;
   onNavigate?: () => void;
+  showGuestAuthActions?: boolean;
 }) {
   const mainItems = getVisibleItems(PRIMARY_NAV_ITEMS, auth);
+  const guestAuthItems = showGuestAuthActions ? getVisibleItems(GUEST_NAV_ITEMS, auth) : [];
   const myAreaItems = getVisibleItems(SIDEBAR_MY_AREA_ITEMS, auth)
     .filter((item) => {
       if (item.href !== "/my-team") return true;
@@ -150,6 +154,30 @@ function SidebarContent({
           </section>
         )}
 
+        {guestAuthItems.length > 0 && (
+          <section className="mt-8 pt-2">
+            <h2 className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--nav-muted)]">
+              Account
+            </h2>
+            <div className="space-y-2 px-3">
+              {guestAuthItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={`inline-flex h-10 w-full items-center justify-center rounded-lg px-3 text-sm font-semibold transition ${
+                    item.label === "Login"
+                      ? "bg-[color:var(--btn-primary-bg)] text-[color:var(--btn-primary-text)] hover:bg-[color:var(--btn-primary-hover)]"
+                      : "border border-[color:var(--nav-border)] bg-[color:var(--nav-surface)] text-[color:var(--nav-text)] hover:bg-[color:var(--nav-hover)]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
       </div>
 
       {utilityItems.length > 0 && (
@@ -190,11 +218,11 @@ export default function Sidebar({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-[color:var(--nav-border)] bg-[color:var(--nav-bg)] p-5 shadow-[8px_0_28px_rgba(2,8,23,0.12)] backdrop-blur transition-transform duration-200 ease-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-[min(18rem,calc(100vw-1rem))] border-r border-[color:var(--nav-border)] bg-[color:var(--nav-bg)] px-4 pb-5 pt-4 shadow-[8px_0_28px_rgba(2,8,23,0.12)] backdrop-blur transition-transform duration-200 ease-out lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-5 flex items-center justify-between pb-2">
+        <div className="mb-4 flex items-center justify-between border-b border-[color:var(--nav-border)] pb-3">
           <Link href="/" onClick={onMobileClose} className="inline-flex items-center gap-2">
             <span className="brand-logo-stack h-5 w-5">
               <Image
@@ -221,13 +249,18 @@ export default function Sidebar({
             type="button"
             onClick={onMobileClose}
             aria-label="Close menu"
-            className="btn-icon-lg"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)]/95 text-[color:var(--foreground)] shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/35 [html[data-theme='dark']_&]:border-[color:var(--nav-border)] [html[data-theme='dark']_&]:bg-[color:var(--nav-surface)] [html[data-theme='dark']_&]:shadow-[0_8px_20px_rgba(0,0,0,0.24)] [html[data-theme='dark']_&]:hover:bg-[color:var(--nav-hover)]"
           >
             <X className="h-6 w-6" strokeWidth={2.5} />
           </button>
         </div>
-        <div className="h-[calc(100%-3.25rem)]">
-          <SidebarContent auth={auth} pathname={pathname} onNavigate={onMobileClose} />
+        <div className="h-[calc(100%-4rem)] overflow-y-auto pr-1">
+          <SidebarContent
+            auth={auth}
+            pathname={pathname}
+            onNavigate={onMobileClose}
+            showGuestAuthActions
+          />
         </div>
       </aside>
 

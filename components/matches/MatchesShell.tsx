@@ -81,6 +81,10 @@ function isUpcomingLike(status: string) {
   return normalized === "SCHEDULED" || normalized === "TIMED" || normalized === "IN_PLAY" || normalized === "PAUSED";
 }
 
+function displayTeamLabel(team: MatchTeam) {
+  return team.shortName?.trim() || team.name;
+}
+
 function MatchCard({ match }: { match: MatchRecord }) {
   const router = useRouter();
   const showScore = match.homeScore !== null && match.awayScore !== null;
@@ -99,8 +103,8 @@ function MatchCard({ match }: { match: MatchRecord }) {
       }}
       className="cursor-pointer rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_20px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-400/55 focus:ring-offset-2 focus:ring-offset-[color:var(--background)]"
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 sm:gap-3">
+        <div className="flex min-w-0 flex-col items-center gap-2 text-center">
           {match.homeTeam.crestUrl ? (
             <Image
               src={match.homeTeam.crestUrl}
@@ -115,20 +119,32 @@ function MatchCard({ match }: { match: MatchRecord }) {
             </span>
           )}
 
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-full">
             <Link
               href={`/teams/${match.homeTeam.id}`}
               onClick={(event) => event.stopPropagation()}
-              className="block truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline"
+              className="block truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline sm:hidden"
+            >
+              {displayTeamLabel(match.homeTeam)}
+            </Link>
+            <Link
+              href={`/teams/${match.homeTeam.id}`}
+              onClick={(event) => event.stopPropagation()}
+              className="hidden truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline sm:block"
             >
               {match.homeTeam.name}
             </Link>
-            <p className="truncate text-xs text-[color:var(--muted-foreground)]">{match.homeTeam.shortName}</p>
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--muted-foreground)] sm:hidden">
+              {match.homeTeam.name}
+            </p>
+            <p className="hidden truncate text-xs text-[color:var(--muted-foreground)] sm:block">
+              {match.homeTeam.shortName}
+            </p>
           </div>
         </div>
 
-        <div className="text-center">
-          <p className="text-xl font-black tracking-tight text-[color:var(--foreground)]">
+        <div className="min-w-[6.25rem] text-center sm:min-w-[7.25rem]">
+          <p className="text-xl font-black tracking-tight text-[color:var(--foreground)] sm:text-2xl">
             {showScore ? `${match.homeScore} - ${match.awayScore}` : formatKickoffTime(match.utcDate)}
           </p>
           <p
@@ -142,18 +158,7 @@ function MatchCard({ match }: { match: MatchRecord }) {
           </p>
         </div>
 
-        <div className="flex min-w-0 items-center justify-end gap-3">
-          <div className="min-w-0 text-right">
-            <Link
-              href={`/teams/${match.awayTeam.id}`}
-              onClick={(event) => event.stopPropagation()}
-              className="block truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline"
-            >
-              {match.awayTeam.name}
-            </Link>
-            <p className="truncate text-xs text-[color:var(--muted-foreground)]">{match.awayTeam.shortName}</p>
-          </div>
-
+        <div className="flex min-w-0 flex-col items-center gap-2 text-center">
           {match.awayTeam.crestUrl ? (
             <Image
               src={match.awayTeam.crestUrl}
@@ -167,14 +172,37 @@ function MatchCard({ match }: { match: MatchRecord }) {
               <Shield className="h-5 w-5 text-[color:var(--muted-foreground)]" />
             </span>
           )}
+
+          <div className="min-w-0 max-w-full">
+            <Link
+              href={`/teams/${match.awayTeam.id}`}
+              onClick={(event) => event.stopPropagation()}
+              className="block truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline sm:hidden"
+            >
+              {displayTeamLabel(match.awayTeam)}
+            </Link>
+            <Link
+              href={`/teams/${match.awayTeam.id}`}
+              onClick={(event) => event.stopPropagation()}
+              className="hidden truncate text-sm font-semibold text-[color:var(--foreground)] underline-offset-2 transition hover:text-sky-400 hover:underline sm:block"
+            >
+              {match.awayTeam.name}
+            </Link>
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--muted-foreground)] sm:hidden">
+              {match.awayTeam.name}
+            </p>
+            <p className="hidden truncate text-xs text-[color:var(--muted-foreground)] sm:block">
+              {match.awayTeam.shortName}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-[color:var(--surface-border)] pt-3">
-        <p className="text-xs text-[color:var(--muted-foreground)]">
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--surface-border)] pt-3">
+        <p className="min-w-0 text-xs text-[color:var(--muted-foreground)]">
           Matchweek {match.matchWeek ?? "-"}
         </p>
-        <p className="text-xs font-semibold text-sky-400">Open details</p>
+        <p className="shrink-0 text-xs font-semibold text-sky-400">Open details</p>
       </div>
     </article>
   );

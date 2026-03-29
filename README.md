@@ -1,20 +1,48 @@
 # SportsDeck
 
-SportsDeck is a production-mode Next.js app backed by PostgreSQL, Redis, Prisma, and Nginx. The repo includes Docker configuration for the full stack so it can run in a fresh environment.
+SportsDeck is a football discussion platform built with Next.js, React, Tailwind CSS, Prisma, PostgreSQL, Redis, and Nginx. Users can follow teams and people, join match and community discussions, vote in polls, view AI-powered sentiment and translation features, and use moderation/reporting tools.
 
-## Containers
+## Features
 
-The Docker setup includes:
+- account creation and authentication
+- live football match, team, and standings data
+- discussion threads, replies, nested replies, and polls
+- social features including profiles, followers, and following
+- moderation flows including reports, suspensions, bans, and appeals
+- AI-powered translation, sentiment indicators, and digest features
+- production Docker deployment with PostgreSQL, Redis, and Nginx
 
-- `db` for PostgreSQL
-- `redis` for standalone cache storage
-- `seeder` for `prisma migrate deploy` and `prisma/seed.ts`
-- `app` for the production Next.js server
-- `nginx` as the reverse proxy on port `80`
+## Deployment
 
-## Required environment variables
+- Public deployment URL: add the final deployed URL to `url.txt`
+- Local production run: use Docker Compose with the included scripts
 
-Create a `.env` file with values for:
+## Stack
+
+- Next.js + React + TypeScript
+- Tailwind CSS
+- Prisma ORM
+- PostgreSQL
+- Redis
+- Nginx
+- Hugging Face Inference API
+- football-data.org API
+
+## Run Locally With Docker
+
+The project is designed to run in production mode through Docker Compose.
+
+### Included services
+
+- `app` - production Next.js server
+- `db` - PostgreSQL
+- `redis` - standalone cache server
+- `seeder` - runs `prisma migrate deploy` and `prisma/seed.ts`
+- `nginx` - reverse proxy
+
+### Required environment variables
+
+Create a `.env` file and provide values for:
 
 - `DATABASE_URL`
 - `REDIS_URL`
@@ -41,27 +69,65 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sportsdeck"
 REDIS_URL="redis://localhost:6379"
 ```
 
-Inside Docker Compose, the app container is automatically pointed at:
+Inside Docker Compose, the app automatically talks to:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@db:5432/sportsdeck"
 REDIS_URL="redis://redis:6379"
 ```
 
-## Run with Docker
+### Start the app
 
-Build and start everything with:
+```bash
+./start.sh
+```
+
+Or run Docker Compose directly:
 
 ```bash
 docker compose up --build
 ```
 
-Then open [http://localhost](http://localhost).
+### Stop the app
 
-## Notes
+```bash
+./stop.sh
+```
+
+### Import or refresh sports data
+
+```bash
+./import-data.sh
+```
+
+### Local URLs
+
+- `http://localhost:3000` - direct Next.js app
+- `http://localhost` - app through Nginx
+
+## Build Notes
 
 - The Next.js app is built during the Docker build phase with `npm run build`.
-- The production container serves the standalone build output.
-- PostgreSQL uses a named volume for persistent database storage.
-- Redis uses a named volume for standalone cache persistence.
-- Nginx forwards incoming traffic to the Next.js app container.
+- The production container serves the standalone Next.js output.
+- PostgreSQL uses a named volume for persistence.
+- Redis uses a named volume for cache persistence.
+- Nginx forwards incoming traffic to the app container.
+
+## Seeded Demo Data
+
+The seed script populates the app with substantial demo content, including:
+
+- around 100 users with different join dates and favorite teams
+- suspended and banned users
+- appeals and user reports
+- 200+ discussion and team threads
+- generated posts, replies, nested replies, and edited comments
+- multilingual comments
+- seeded polls with votes
+- follow relationships between users
+
+## Credits
+
+- Match and standings data: [football-data.org](https://www.football-data.org/)
+- AI translation and analysis: [Hugging Face Inference API](https://huggingface.co/)
+- Default avatar icons: [Freepik](https://www.freepik.com/)

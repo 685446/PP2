@@ -92,16 +92,16 @@ export function MatchActivityCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] ${
+      className={`group block rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:p-5 ${
         className ?? ""
       }`}
       aria-label={ariaLabel}
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--muted-foreground)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--muted-foreground)]">
           {leagueLabel}
         </p>
-        <div className="inline-flex items-center gap-2">
+        <div className="inline-flex shrink-0 items-center gap-2 self-start sm:self-auto">
           <span className="rounded-full border border-sky-500/35 bg-sky-500/12 px-2.5 py-1 text-xs font-semibold text-sky-500">
             {statusLabel}
           </span>
@@ -109,38 +109,40 @@ export function MatchActivityCard({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-5">
-        <div className="flex flex-col items-center gap-2 text-center">
+      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
+        <div className="min-w-0 flex flex-col items-center gap-2 text-center">
           <TeamCrest
             name={homeTeam.name}
             shortName={homeTeam.shortName}
             crestUrl={homeTeam.crestUrl}
-            className="h-16 w-16 object-contain"
+            className="h-14 w-14 object-contain sm:h-16 sm:w-16"
           />
-          <p className="text-sm font-medium text-[color:var(--muted-foreground)]">
+          <p className="max-w-full truncate text-xs font-medium text-[color:var(--muted-foreground)] sm:text-sm">
             {homeTeam.shortName || homeTeam.name}
           </p>
         </div>
 
-        <p className="text-5xl font-black tracking-tight text-[color:var(--foreground)]">
+        <p className="shrink-0 text-3xl font-black tracking-tight text-[color:var(--foreground)] sm:text-5xl">
           {homeScore ?? "-"} - {awayScore ?? "-"}
         </p>
 
-        <div className="flex flex-col items-center gap-2 text-center">
+        <div className="min-w-0 flex flex-col items-center gap-2 text-center">
           <TeamCrest
             name={awayTeam.name}
             shortName={awayTeam.shortName}
             crestUrl={awayTeam.crestUrl}
-            className="h-16 w-16 object-contain"
+            className="h-14 w-14 object-contain sm:h-16 sm:w-16"
           />
-          <p className="text-sm font-medium text-[color:var(--muted-foreground)]">
+          <p className="max-w-full truncate text-xs font-medium text-[color:var(--muted-foreground)] sm:text-sm">
             {awayTeam.shortName || awayTeam.name}
           </p>
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <p className="min-w-0 flex-1 text-lg font-semibold text-[color:var(--foreground)]">{headline}</p>
+      <div className="mt-4 flex flex-col gap-3 sm:mt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="min-w-0 flex-1 break-words text-base font-semibold text-[color:var(--foreground)] [overflow-wrap:anywhere] sm:text-lg">
+          {headline}
+        </p>
         {typeof count === "number" ? <CountChip count={count} /> : null}
       </div>
     </Link>
@@ -169,19 +171,25 @@ export function DiscussionActivityCard({
       }`}
       aria-label={ariaLabel}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">{headerLeft}</div>
-        <span className="shrink-0 text-xs text-[color:var(--muted-foreground)]">{timeLabel}</span>
+        <span className="shrink-0 text-xs text-[color:var(--muted-foreground)] sm:text-right">{timeLabel}</span>
       </div>
 
       {relation ? <div className="mt-2">{relation}</div> : null}
 
-      <h2 className={`mt-3 text-lg font-semibold text-[color:var(--foreground)] ${titleClassName ?? ""}`}>
+      <h2
+        className={`mt-3 break-words text-base font-semibold text-[color:var(--foreground)] [overflow-wrap:anywhere] sm:text-lg ${titleClassName ?? ""}`}
+      >
         {title}
       </h2>
-      <p className={`mt-2 text-sm text-[color:var(--muted-foreground)] ${summaryClassName ?? ""}`}>{summary}</p>
+      <p
+        className={`mt-2 break-words text-sm text-[color:var(--muted-foreground)] [overflow-wrap:anywhere] ${summaryClassName ?? ""}`}
+      >
+        {summary}
+      </p>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-[color:var(--muted-foreground)]">
+      <div className="mt-3 flex flex-col gap-3 text-xs font-medium text-[color:var(--muted-foreground)] sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">{footerLeft}</div>
         {typeof count === "number" ? <CountChip count={count} /> : null}
       </div>

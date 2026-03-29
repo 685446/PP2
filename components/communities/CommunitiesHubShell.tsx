@@ -51,6 +51,10 @@ function getTeamInitials(name: string, shortName: string) {
     .toUpperCase();
 }
 
+function communityTeamLabel(team: TeamRecord) {
+  return team.shortName?.trim() || team.name;
+}
+
 export default function CommunitiesHubShell() {
   const [teams, setTeams] = useState<TeamRecord[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -126,14 +130,14 @@ export default function CommunitiesHubShell() {
 
         <div className="relative flex items-center gap-4">
           <MessageCircle className="h-8 w-8 shrink-0 text-sky-100 drop-shadow-[0_8px_16px_rgba(2,8,23,0.32)] [html[data-theme='light']_&]:text-sky-700" />
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72 [html[data-theme='light']_&]:text-white/80">
               Featured Community
             </p>
-            <p className="text-3xl font-black leading-tight text-white [html[data-theme='light']_&]:text-white">
+            <p className="text-2xl font-black leading-tight text-white [html[data-theme='light']_&]:text-white sm:text-3xl">
               Premier League General
             </p>
-            <p className="text-base text-white/88 [html[data-theme='light']_&]:text-white/90">
+            <p className="text-sm text-white/88 [html[data-theme='light']_&]:text-white/90 sm:text-base">
               League-wide discussion, opinions, and matchweek talk.
             </p>
           </div>
@@ -203,10 +207,10 @@ export default function CommunitiesHubShell() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72 [html[data-theme='light']_&]:text-white/80">
                     Team Community
                   </p>
-                  <p className="truncate text-xl font-bold sm:text-2xl">
-                    {team.name} Thread
+                  <p className="truncate text-lg font-bold sm:text-2xl">
+                    {communityTeamLabel(team)} Community
                   </p>
-                  <p className="max-w-xl truncate text-sm text-white/88 [html[data-theme='light']_&]:text-white/90">
+                  <p className="max-w-xl text-sm text-white/88 [html[data-theme='light']_&]:text-white/90 sm:truncate">
                     Join supporters, matchday reactions, and club-specific discussion.
                   </p>
                   <p className="inline-flex items-center gap-2 text-sm text-white/84 [html[data-theme='light']_&]:text-white/88">
