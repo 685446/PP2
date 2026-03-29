@@ -1,0 +1,223 @@
+﻿import type { HomeFeedItem } from "@/components/home/types";
+
+export const GUEST_FEED_ITEMS: HomeFeedItem[] = [
+  {
+    id: "guest-team-update-1",
+    type: "team-update",
+    originKind: "match",
+    title: "League update: Top-4 race tightens",
+    summary: "Recent results shifted positions near European spots. Catch up in standings and threads.",
+    context: "Premier League snapshot",
+    timestampLabel: "12m ago",
+    createdAtMs: Date.now() - 12 * 60 * 1000,
+    href: "/standings",
+  },
+  {
+    id: "guest-following-1",
+    type: "following",
+    originKind: "thread",
+    engagement: {
+      directCount: 4,
+      unit: "posts",
+    },
+    title: "Community spotlight: Tactical breakdown thread",
+    summary: "Fans are discussing in-game adjustments and player roles in trending discussions.",
+    context: "Discussion spotlight",
+    timestampLabel: "34m ago",
+    createdAtMs: Date.now() - 34 * 60 * 1000,
+    href: "/discussions",
+  },
+  {
+    id: "guest-reply-1",
+    type: "reply",
+    originKind: "post",
+    postRelation: {
+      kind: "in-thread",
+      label: "Everton vs Chelsea - Match Thread",
+    },
+    engagement: {
+      directCount: 1,
+      unit: "replies",
+    },
+    title: "New match thread unlocked",
+    summary: "Pre-match conversation is open for upcoming fixtures this weekend.",
+    context: "Upcoming fixtures",
+    timestampLabel: "58m ago",
+    createdAtMs: Date.now() - 58 * 60 * 1000,
+    href: "/matches",
+  },
+];
+
+export const PREVIEW_FEED_ITEMS: HomeFeedItem[] = [
+  {
+    id: "preview-reply-match-thread",
+    type: "reply",
+    originKind: "post",
+    postRelation: {
+      kind: "replying-to",
+      label: "NeymarFan",
+    },
+    engagement: {
+      directCount: 3,
+      unit: "replies",
+    },
+    title: "4 new replies in your match thread",
+    summary: "Fans are debating the late substitutions and VAR decision in the 82nd minute.",
+    context: "Match thread: Chelsea vs Arsenal",
+    timestampLabel: "7m ago",
+    createdAtMs: Date.now() - 7 * 60 * 1000,
+    href: "/threads/1?source=preview",
+  },
+  {
+    id: "preview-following-team-thread",
+    type: "following",
+    originKind: "thread",
+    engagement: {
+      directCount: 7,
+      unit: "posts",
+    },
+    title: "Should Chelsea invert the full-backs against high press?",
+    summary: "I think we should invert on the right side only and keep width on the opposite flank to avoid getting pinned in build-up.",
+    context: "Team forum: Chelsea FC",
+    contextCrestUrl: "https://crests.football-data.org/61.svg",
+    contextCrestAlt: "Chelsea FC crest",
+    actor: {
+      username: "NeymarFan",
+      avatar: "/avatars/default2.png",
+    },
+    timestampLabel: "16m ago",
+    createdAtMs: Date.now() - 16 * 60 * 1000,
+    href: "/threads/2?source=preview",
+  },
+  {
+    id: "preview-team-update-score",
+    type: "team-update",
+    originKind: "match",
+    title: "Chelsea 2-1 Arsenal - FT",
+    summary: "Final whistle. The match thread has fresh post-game analysis and player ratings.",
+    context: "Team update: Matchday result",
+    timestampLabel: "31m ago",
+    createdAtMs: Date.now() - 31 * 60 * 1000,
+    href: "/threads/3?source=preview",
+    matchInfo: {
+      homeTeam: {
+        name: "Chelsea",
+        shortName: "CHE",
+        crestUrl: "https://crests.football-data.org/61.svg",
+      },
+      awayTeam: {
+        name: "Arsenal",
+        shortName: "ARS",
+        crestUrl: "https://crests.football-data.org/57.svg",
+      },
+      score: {
+        home: 2,
+        away: 1,
+      },
+      status: "FINISHED",
+      matchWeek: 31,
+      leagueLabel: "Premier League",
+    },
+  },
+  {
+    id: "preview-following-general-thread",
+    type: "following",
+    originKind: "thread",
+    engagement: {
+      directCount: 5,
+      unit: "posts",
+    },
+    title: "Who actually has the tougher title run-in this season?",
+    summary: "Comparing final six fixtures side by side, I still think the away schedule decides the race more than current table position.",
+    context: "General discussion",
+    actor: {
+      username: "Hashir",
+      avatar: "/avatars/default4.png",
+    },
+    timestampLabel: "58m ago",
+    createdAtMs: Date.now() - 58 * 60 * 1000,
+    href: "/threads/4?source=preview",
+  },
+  {
+    id: "preview-reply-general-thread-2",
+    type: "reply",
+    originKind: "post",
+    postRelation: {
+      kind: "in-thread",
+      label: "Transfer window debate",
+    },
+    engagement: {
+      directCount: 2,
+      unit: "replies",
+    },
+    title: "2 new replies in your transfer rumor thread",
+    summary: "Users challenged your take on January signings and injury cover options.",
+    context: "General thread: Transfer window debate",
+    timestampLabel: "1h ago",
+    createdAtMs: Date.now() - 60 * 60 * 1000,
+    href: "/threads/5?source=preview",
+  },
+  {
+    id: "preview-following-team-thread-2",
+    type: "following",
+    originKind: "thread",
+    engagement: {
+      directCount: 6,
+      unit: "posts",
+    },
+    title: "Predicted XI for the next Chelsea matchday",
+    summary: "If both wingers are fit, I would start with a 4-2-3-1 and use the second striker role as an in-game switch, not as the default setup.",
+    context: "Team forum: Chelsea FC",
+    contextCrestUrl: "https://crests.football-data.org/61.svg",
+    contextCrestAlt: "Chelsea FC crest",
+    actor: {
+      username: "LenaBlues",
+      avatar: "/avatars/default3.png",
+    },
+    timestampLabel: "1h ago",
+    createdAtMs: Date.now() - 75 * 60 * 1000,
+    href: "/threads/6?source=preview",
+  },
+  {
+    id: "preview-reply-team-thread-2",
+    type: "reply",
+    originKind: "post",
+    postRelation: {
+      kind: "replying-to",
+      label: "LenaBlues",
+    },
+    engagement: {
+      directCount: 4,
+      unit: "replies",
+    },
+    title: "5 new replies in your player ratings post",
+    summary: "Fans are debating midfield ratings and defensive shape in the second half.",
+    context: "Team thread: Post-match ratings",
+    timestampLabel: "2h ago",
+    createdAtMs: Date.now() - 2 * 60 * 60 * 1000,
+    href: "/threads/7?source=preview",
+  },
+  {
+    id: "preview-following-general-thread-3",
+    type: "following",
+    originKind: "thread",
+    engagement: {
+      directCount: 3,
+      unit: "posts",
+    },
+    title: "Are officiating standards improving this season?",
+    summary: "After reviewing several recent calls, I feel consistency is still the main issue rather than strictness.",
+    context: "General discussion",
+    actor: {
+      username: "JamesPL",
+      avatar: "/avatars/default5.png",
+    },
+    timestampLabel: "3h ago",
+    createdAtMs: Date.now() - 3 * 60 * 60 * 1000,
+    href: "/threads/8?source=preview",
+  },
+];
+
+export const PREVIEW_NON_MATCH_FEED_ITEMS: HomeFeedItem[] = PREVIEW_FEED_ITEMS.filter(
+  (item) => item.type !== "team-update"
+);

@@ -1,0 +1,344 @@
+// schema.prisma - SportsDeck (Premier League)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  TIMED
+  IN_PLAY
+  PAUSED
+  FINISHED
+  SUSPENDED
+  POSTPONED
+  CANCELLED
+  AWARDED
+}
+
+enum ThreadType {
+  GENERAL  // league-wide discussion
+  TEAM     // specific to a team's forum
+  MATCH    // auto-created for each match
+}
+
+enum ReportStatus {
+  PENDING
+  DISMISSED
+  APPROVED
+}
+
+enum ReportTargetType {
+  POST
+  THREAD
+  USER
+}
+
+enum AppealStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────
+
+model User {         
+  id              Int           @id @default(autoincrement())
+  email           String        @unique
+  passwordHash    String
+  username        String        @unique
+  avatar          String        @default("/avatars/default1.png")
+  role            Role          @default(USER)
+  status          AccountStatus @default(ACTIVE)
+  statusReason    String        @default("")
+  suspendedUntil  DateTime?
+  appealApprovedNoticePending Boolean @default(false)
+  favoriteTeamId  Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  favoriteTeam    Team?         @relation("FavoriteTeam", fields: [favoriteTeamId], references: [id])
+  threads         Thread[]
+  posts           Post[]
+
+  following       Follow[]      @relation("follower")
+  followers       Follow[]      @relation("following")
+
+  polls           Poll[]
+  pollVotes       PollVote[]
+  
+  reportsFiled    Report[]      @relation("ReportReporter")
+  reportsReceived Report[]      @relation("ReportedUser")
+  appeals   Appeal[]
+}
+
+// ─────────────────────────────────────────
+// FOLLOW
+// ─────────────────────────────────────────
+
+model Follow {
+  followerId  Int
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  follower    User @relation("follower",  fields: [followerId],  references: [id])
+  following   User @relation("following", fields: [followingId], references: [id])
+
+  @@id([followerId, followingId])
+  @@index([followerId])   // get all users I follow
+  @@index([followingId])  // get all my followers
+}
+
+// ─────────────────────────────────────────
+// TEAM
+// ─────────────────────────────────────────
+
+model Team {
+  id          Int       @id @default(autoincrement())
+  externalId  String    @unique  // from football-data.org
+  name        String
+  shortName   String
+  crestUrl    String?
+  venue       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  homeMatches Match[]   @relation("homeTeam")
+  awayMatches Match[]   @relation("awayTeam")
+  threads     Thread[]
+  standings   Standing[]
+  fans        User[]    @relation("FavoriteTeam")
+}
+
+// ─────────────────────────────────────────
+// MATCH
+// ─────────────────────────────────────────
+
+model Match {
+  id          Int       @id @default(autoincrement())
+  externalId  String    @unique // from football-data.org
+  homeTeamId  Int
+  awayTeamId  Int
+  matchWeek   Int
+  season      String            // e.g. "2024-25"
+  utcDate     DateTime          // kickoff time
+  status      MatchStatus            
+  venue       String
+  homeScore   Int?
+  awayScore   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  homeTeam    Team      @relation("homeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team      @relation("awayTeam", fields: [awayTeamId], references: [id])
+  thread      Thread?
+
+  @@index([matchWeek])  // fetch all matches for a matchweek
+  @@index([season])     // fetch all matches for a season
+
+}
+
+// ─────────────────────────────────────────
+// STANDING
+// ─────────────────────────────────────────
+
+model Standing {
+  id              Int       @id @default(autoincrement())
+  teamId          Int
+  season          String
+  position        Int
+  playedGames     Int
+  won             Int
+  draw            Int
+  lost            Int
+  points          Int
+  goalDifference  Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  team            Team      @relation(fields: [teamId], references: [id])
+  @@index([season])     // fetch standings for a season
+  @@unique([teamId, season])
+}
+
+// ─────────────────────────────────────────
+// THREAD
+// ─────────────────────────────────────────
+
+model Thread {
+  id        Int         @id @default(autoincrement())
+  title     String
+  type      ThreadType
+  body      String
+  authorId  Int
+  teamId    Int?                // null if GENERAL
+  matchId   Int?        @unique // only for MATCH threads
+  isHidden  Boolean     @default(false)
+  openAt    DateTime            // when thread opens for comments
+  closedAt  DateTime?           // null = never closes
+  poll      Poll?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  author    User        @relation(fields: [authorId], references: [id])
+  team      Team?       @relation(fields: [teamId], references: [id])
+  match     Match?      @relation(fields: [matchId], references: [id])
+  posts     Post[]
+  tags      ThreadTag[]
+  reports   Report[]
+
+  @@index([teamId])     // fetch all threads for a team
+  @@index([matchId])    // fetch thread for a match
+  @@index([authorId])   // fetch all threads by a user
+}
+
+// ─────────────────────────────────────────
+// POST + EDITING (covers both posts and replies)
+// parentId = null  -> main/top-level post
+// parentId = set   -> reply to another post
+// ─────────────────────────────────────────
+
+model Post {
+  id        Int       @id @default(autoincrement())
+  content   String
+  authorId  Int
+  threadId  Int
+  parentId  Int?
+  isHidden  Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+  edits     PostEdit[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  author    User      @relation(fields: [authorId], references: [id])
+  thread    Thread    @relation(fields: [threadId], references: [id])
+  parent    Post?     @relation("replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Post[]    @relation("replies")
+  reports   Report[]
+
+  @@index([threadId])   // fetch all posts in a thread
+  @@index([authorId])   // fetch all posts by a user
+  @@index([parentId])   // fetch all replies to a post
+}
+
+model PostEdit {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  content   String
+  editedAt  DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+}
+
+// ─────────────────────────────────────────
+// TAG + THREADTAG
+// ─────────────────────────────────────────
+
+model Tag {
+  id      Int         @id @default(autoincrement())
+  name    String      @unique
+  threads ThreadTag[]
+}
+
+model ThreadTag {
+  threadId Int
+  tagId    Int
+
+  thread   Thread @relation(fields: [threadId], references: [id])
+  tag      Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([threadId, tagId])
+}
+
+// ─────────────────────────────────────────
+// POLL
+// ─────────────────────────────────────────
+
+model Poll {
+  id        Int           @id @default(autoincrement())
+  question  String
+  threadId  Int           @unique
+  authorId  Int
+  deadline  DateTime
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  thread    Thread        @relation(fields: [threadId], references: [id])
+  author    User          @relation(fields: [authorId], references: [id])
+  options   PollOption[]
+}
+
+model PollOption {
+  id      Int        @id @default(autoincrement())
+  text    String
+  pollId  Int
+
+  poll    Poll       @relation(fields: [pollId], references: [id])
+  votes   PollVote[]
+}
+
+model PollVote {
+  userId        Int
+  pollOptionId  Int
+  createdAt     DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id])
+  option        PollOption  @relation(fields: [pollOptionId], references: [id])
+
+  @@id([userId, pollOptionId])
+}
+
+// ─────────────────────────────────────────
+// REPORT
+// ─────────────────────────────────────────
+
+model Report {
+  id          Int               @id @default(autoincrement())
+  reporterId  Int
+  targetType  ReportTargetType
+  postId      Int?
+  threadId    Int?
+  reportedUserId Int?
+  reason      String
+  status      ReportStatus      @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  reporter    User              @relation("ReportReporter", fields: [reporterId], references: [id])
+  reportedUser User?            @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  post        Post?             @relation(fields: [postId], references: [id])
+  thread      Thread?           @relation(fields: [threadId], references: [id])
+}
+
+// ─────────────────────────────────────────
+// APPEAL
+// ─────────────────────────────────────────
+
+model Appeal {
+  id        Int           @id @default(autoincrement())
+  userId    Int
+  reason    String
+  status    AppealStatus  @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id])
+}

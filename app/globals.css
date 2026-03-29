@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+:root {
+  --font-ui: "Avenir Next", "Segoe UI", sans-serif;
+  --font-heading: "Trebuchet MS", "Avenir Next", sans-serif;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted-foreground: #475569;
+  --surface: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --surface-border: rgba(15, 23, 42, 0.12);
+  --brand-accent: #10b981;
+
+  --nav-bg: rgba(255, 255, 255, 0.86);
+  --nav-surface: rgba(255, 255, 255, 0.92);
+  --nav-border: rgba(15, 23, 42, 0.12);
+  --nav-text: #0f172a;
+  --nav-muted: #64748b;
+  --nav-hover: #e2e8f0;
+  --nav-active-bg: #dbeafe;
+  --nav-active-text: #0f172a;
+  --nav-overlay: rgba(15, 23, 42, 0.45);
+  --nav-badge-bg: #0f172a;
+  --nav-badge-text: #f8fafc;
+  --nav-active-rail: #38bdf8;
+  --nav-hover-rail: rgba(100, 116, 139, 0.72);
+
+  --btn-primary-bg: #0ea5e9;
+  --btn-primary-bg-hover: #0284c7;
+  --btn-primary-border: #0ea5e9;
+  --btn-primary-text: #ffffff;
+
+  --btn-secondary-bg: #f1f5f9;
+  --btn-secondary-bg-hover: #e2e8f0;
+  --btn-secondary-border: rgba(15, 23, 42, 0.14);
+  --btn-secondary-text: #0f172a;
+
+  --auth-aside-bg: radial-gradient(120% 90% at 18% 10%, rgba(20, 184, 166, 0.34), transparent 56%),
+    radial-gradient(110% 90% at 90% 8%, rgba(14, 165, 233, 0.28), transparent 58%),
+    linear-gradient(140deg, #e5f6f1 0%, #d9ecf8 54%, #c3ddee 100%);
+  --auth-aside-stripe-opacity: 0.2;
+  --auth-aside-heading: #0f172a;
+  --auth-aside-card-bg: rgba(255, 255, 255, 0.82);
+  --auth-aside-card-border: rgba(15, 23, 42, 0.16);
+  --auth-aside-card-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
+  --auth-aside-item-color: #0f172a;
+  --auth-aside-icon-bg: rgba(14, 165, 233, 0.14);
+  --auth-aside-icon-border: rgba(14, 165, 233, 0.34);
+  --auth-aside-icon-color: #0c4a6e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-heading);
+  --font-mono: var(--font-geist-mono);
+}
+
+html[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted-foreground: #475569;
+  --surface: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --surface-border: rgba(15, 23, 42, 0.12);
+  --brand-accent: #10b981;
+
+  --nav-bg: rgba(255, 255, 255, 0.86);
+  --nav-surface: rgba(255, 255, 255, 0.92);
+  --nav-border: rgba(15, 23, 42, 0.12);
+  --nav-text: #0f172a;
+  --nav-muted: #64748b;
+  --nav-hover: #e2e8f0;
+  --nav-active-bg: #dbeafe;
+  --nav-active-text: #0f172a;
+  --nav-overlay: rgba(15, 23, 42, 0.45);
+  --nav-badge-bg: #0f172a;
+  --nav-badge-text: #f8fafc;
+  --nav-active-rail: #38bdf8;
+  --nav-hover-rail: rgba(100, 116, 139, 0.72);
+
+  --btn-primary-bg: #0ea5e9;
+  --btn-primary-bg-hover: #0284c7;
+  --btn-primary-border: #0ea5e9;
+  --btn-primary-text: #ffffff;
+
+  --btn-secondary-bg: #f1f5f9;
+  --btn-secondary-bg-hover: #e2e8f0;
+  --btn-secondary-border: rgba(15, 23, 42, 0.14);
+  --btn-secondary-text: #0f172a;
+
+  --auth-aside-bg: radial-gradient(120% 90% at 18% 10%, rgba(20, 184, 166, 0.34), transparent 56%),
+    radial-gradient(110% 90% at 90% 8%, rgba(14, 165, 233, 0.28), transparent 58%),
+    linear-gradient(140deg, #e5f6f1 0%, #d9ecf8 54%, #c3ddee 100%);
+  --auth-aside-stripe-opacity: 0.2;
+  --auth-aside-heading: #0f172a;
+  --auth-aside-card-bg: rgba(255, 255, 255, 0.82);
+  --auth-aside-card-border: rgba(15, 23, 42, 0.16);
+  --auth-aside-card-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
+  --auth-aside-item-color: #0f172a;
+  --auth-aside-icon-bg: rgba(14, 165, 233, 0.14);
+  --auth-aside-icon-border: rgba(14, 165, 233, 0.34);
+  --auth-aside-icon-color: #0c4a6e;
+}
+
+html[data-theme="dark"] {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --muted-foreground: #a1a1aa;
+  --surface: #18181b;
+  --surface-elevated: #27272a;
+  --surface-border: rgba(244, 244, 245, 0.14);
+  --brand-accent: #34d399;
+
+  --nav-bg: rgba(9, 9, 11, 0.92);
+  --nav-surface: rgba(24, 24, 27, 0.92);
+  --nav-border: rgba(244, 244, 245, 0.14);
+  --nav-text: #f4f4f5;
+  --nav-muted: #a1a1aa;
+  --nav-hover: #27272a;
+  --nav-active-bg: #27272a;
+  --nav-active-text: #f4f4f5;
+  --nav-overlay: rgba(0, 0, 0, 0.6);
+  --nav-badge-bg: #f4f4f5;
+  --nav-badge-text: #0f172a;
+  --nav-active-rail: #38bdf8;
+  --nav-hover-rail: rgba(148, 163, 184, 0.65);
+
+  --btn-primary-bg: #0ea5e9;
+  --btn-primary-bg-hover: #38bdf8;
+  --btn-primary-border: #0ea5e9;
+  --btn-primary-text: #ffffff;
+
+  --btn-secondary-bg: #27272a;
+  --btn-secondary-bg-hover: #3f3f46;
+  --btn-secondary-border: rgba(244, 244, 245, 0.14);
+  --btn-secondary-text: #f4f4f5;
+
+  --auth-aside-bg: radial-gradient(120% 90% at 20% 12%, rgba(16, 185, 129, 0.32), transparent 52%),
+    radial-gradient(110% 90% at 90% 8%, rgba(14, 116, 144, 0.28), transparent 56%),
+    linear-gradient(145deg, rgba(16, 185, 129, 0.2), rgba(14, 116, 144, 0.18), rgba(9, 9, 11, 0.96));
+  --auth-aside-stripe-opacity: 0.35;
+  --auth-aside-heading: #ffffff;
+  --auth-aside-card-bg: rgba(2, 6, 23, 0.72);
+  --auth-aside-card-border: rgba(255, 255, 255, 0.2);
+  --auth-aside-card-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
+  --auth-aside-item-color: rgba(255, 255, 255, 0.9);
+  --auth-aside-icon-bg: rgba(255, 255, 255, 0.1);
+  --auth-aside-icon-border: rgba(56, 189, 248, 0.4);
+  --auth-aside-icon-color: #bae6fd;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted-foreground: #a1a1aa;
+    --surface: #18181b;
+    --surface-elevated: #27272a;
+    --surface-border: rgba(244, 244, 245, 0.14);
+    --brand-accent: #34d399;
+    --nav-bg: rgba(9, 9, 11, 0.92);
+    --nav-surface: rgba(24, 24, 27, 0.92);
+    --nav-border: rgba(244, 244, 245, 0.14);
+    --nav-text: #f4f4f5;
+    --nav-muted: #a1a1aa;
+    --nav-hover: #27272a;
+    --nav-active-bg: #27272a;
+    --nav-active-text: #f4f4f5;
+    --nav-overlay: rgba(0, 0, 0, 0.6);
+    --nav-badge-bg: #f4f4f5;
+    --nav-badge-text: #0f172a;
+    --nav-active-rail: #38bdf8;
+    --nav-hover-rail: rgba(148, 163, 184, 0.65);
+    --btn-primary-bg: #0ea5e9;
+    --btn-primary-bg-hover: #38bdf8;
+    --btn-primary-border: #0ea5e9;
+    --btn-primary-text: #ffffff;
+    --btn-secondary-bg: #27272a;
+    --btn-secondary-bg-hover: #3f3f46;
+    --btn-secondary-border: rgba(244, 244, 245, 0.14);
+    --btn-secondary-text: #f4f4f5;
+    --auth-aside-bg: radial-gradient(120% 90% at 20% 12%, rgba(16, 185, 129, 0.32), transparent 52%),
+      radial-gradient(110% 90% at 90% 8%, rgba(14, 116, 144, 0.28), transparent 56%),
+      linear-gradient(145deg, rgba(16, 185, 129, 0.2), rgba(14, 116, 144, 0.18), rgba(9, 9, 11, 0.96));
+    --auth-aside-stripe-opacity: 0.35;
+    --auth-aside-heading: #ffffff;
+    --auth-aside-card-bg: rgba(2, 6, 23, 0.72);
+    --auth-aside-card-border: rgba(255, 255, 255, 0.2);
+    --auth-aside-card-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
+    --auth-aside-item-color: rgba(255, 255, 255, 0.9);
+    --auth-aside-icon-bg: rgba(255, 255, 255, 0.1);
+    --auth-aside-icon-border: rgba(56, 189, 248, 0.4);
+    --auth-aside-icon-color: #bae6fd;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-ui), "Segoe UI", sans-serif;
+  line-height: 1.5;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), var(--font-ui), sans-serif;
+  letter-spacing: 0.003em;
+  line-height: 1.15;
+}
+
+p {
+  line-height: 1.6;
+}
+
+@layer components {
+  .btn-primary {
+    display: inline-flex;
+    height: 2.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--btn-primary-border);
+    background: var(--btn-primary-bg);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--btn-primary-text);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .btn-primary:hover {
+    border-color: var(--btn-primary-bg-hover);
+    background: var(--btn-primary-bg-hover);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    height: 2.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--btn-secondary-border);
+    background: var(--btn-secondary-bg);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--btn-secondary-text);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .btn-secondary:hover {
+    background: var(--btn-secondary-bg-hover);
+  }
+
+  .btn-icon {
+    position: relative;
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    border: 1px solid var(--btn-secondary-border);
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .btn-icon:hover {
+    background: var(--btn-secondary-bg-hover);
+  }
+
+  .btn-icon-lg {
+    display: inline-flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    border: 1px solid var(--btn-secondary-border);
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .btn-icon-lg:hover {
+    background: var(--btn-secondary-bg-hover);
+  }
+
+  .brand-logo-stack {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+  }
+
+  .brand-logo-dark,
+  .brand-logo-light {
+    position: absolute;
+    inset: 0;
+    transition: opacity 220ms ease;
+  }
+
+  .brand-logo-dark {
+    opacity: 1;
+  }
+
+  .brand-logo-light {
+    opacity: 0;
+  }
+
+  html[data-theme="light"] .brand-logo-dark {
+    opacity: 0;
+  }
+
+  html[data-theme="light"] .brand-logo-light {
+    opacity: 1;
+  }
+}
