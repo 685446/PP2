@@ -394,6 +394,7 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
   const [modalTotal, setModalTotal] = useState(0);
   const [modalQueryInput, setModalQueryInput] = useState("");
   const [modalQuery, setModalQuery] = useState("");
+  const [profileAvatarSrc, setProfileAvatarSrc] = useState<string | null>(null);
   const [tabContent, setTabContent] = useState<{
     threads: PaginatedCollection<ThreadRecord>;
     posts: PaginatedCollection<PostRecord>;
@@ -545,6 +546,10 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    setProfileAvatarSrc(data?.profile.avatar ?? null);
+  }, [data?.profile.avatar]);
 
   useEffect(() => {
     if (!socialModal) {
@@ -1323,11 +1328,12 @@ export default function ProfileShell({ targetUserId }: ProfileShellProps) {
           <div className="relative z-20 -mt-16 sm:-mt-20">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="shrink-0">
-                {profile.avatar ? (
+                {profileAvatarSrc ? (
                   <img
-                    src={profile.avatar}
+                    src={profileAvatarSrc}
                     alt={`${profile.username} avatar`}
                     className="relative z-20 h-28 w-28 rounded-full border-2 border-[color:var(--surface)] object-cover shadow-[0_10px_26px_rgba(2,8,23,0.28)] ring-2 ring-[color:var(--surface)] sm:h-32 sm:w-32"
+                    onError={() => setProfileAvatarSrc("/avatars/default1.png")}
                   />
                 ) : (
                   <span className="relative z-20 inline-flex h-28 w-28 items-center justify-center rounded-full border-2 border-[color:var(--surface)] bg-[color:var(--surface-elevated)] text-4xl font-black text-[color:var(--foreground)] shadow-[0_10px_26px_rgba(2,8,23,0.28)] ring-2 ring-[color:var(--surface)] sm:h-32 sm:w-32">

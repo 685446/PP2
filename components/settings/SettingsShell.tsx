@@ -385,6 +385,7 @@ export default function SettingsShell() {
     "idle" | "uploading" | "success" | "error"
   >("idle");
   const [avatarUploadNotice, setAvatarUploadNotice] = useState<string | null>(null);
+  const [avatarPreviewCurrentSrc, setAvatarPreviewCurrentSrc] = useState("/avatars/default1.png");
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamsError, setTeamsError] = useState<string | null>(null);
@@ -1313,6 +1314,17 @@ export default function SettingsShell() {
         throw new Error("Upload succeeded, but avatar URL was not returned.");
       }
 
+      const avatarCheck = await fetch(payload.avatar, {
+        method: "HEAD",
+        cache: "no-store",
+      });
+
+      if (!avatarCheck.ok) {
+        throw new Error(
+          "Avatar uploaded, but it could not be served. Please try again."
+        );
+      }
+
       updateProfileField("avatar", payload.avatar);
       setAvatarUploadState("success");
       setAvatarUploadNotice("Avatar uploaded. Click Save Changes to apply.");
@@ -1334,6 +1346,10 @@ export default function SettingsShell() {
     activeTab === "profile" &&
     profileDirty &&
     profileSaveState !== "saving";
+
+  useEffect(() => {
+    setAvatarPreviewCurrentSrc(avatarPreviewSrc);
+  }, [avatarPreviewSrc]);
 
   useEffect(() => {
     if (!hasUnsavedProfileChanges) return;
@@ -1708,9 +1724,14 @@ export default function SettingsShell() {
                       <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] p-3 sm:p-4">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                           <img
-                            src={avatarPreviewSrc}
+                            src={avatarPreviewCurrentSrc}
                             alt="Avatar preview"
                             className="h-20 w-20 rounded-2xl border border-[color:var(--surface-border)] object-cover shadow-sm"
+                            onError={() => {
+                              if (avatarPreviewCurrentSrc !== "/avatars/default1.png") {
+                                setAvatarPreviewCurrentSrc("/avatars/default1.png");
+                              }
+                            }}
                           />
 
                           <div className="min-w-0 flex-1 space-y-3">

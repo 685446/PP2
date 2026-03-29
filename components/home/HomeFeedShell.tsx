@@ -27,7 +27,6 @@ import {
   type StoredAuthSession,
 } from "@/components/auth/session";
 import FeedCard from "@/components/home/FeedCard";
-import { GUEST_FEED_ITEMS } from "@/components/home/feedData";
 import { normalizeFeedItems, type ApiFeedResponse } from "@/components/home/feedMapper";
 import type { FeedItemType, HomeFeedItem } from "@/components/home/types";
 import ThreadComposerForm from "@/components/shared/ThreadComposerForm";
@@ -594,31 +593,44 @@ function FeedSkeletonList() {
 }
 
 function FeedEmptyState({ isAuthenticated }: { isAuthenticated: boolean }) {
+  if (!isAuthenticated) {
+    return (
+      <div className="relative overflow-hidden rounded-[28px] border border-sky-500/30 bg-[linear-gradient(135deg,rgba(14,165,233,0.18)_0%,rgba(37,99,235,0.14)_22%,rgba(15,23,42,0.965)_62%,rgba(15,23,42,1)_100%)] p-6 shadow-[0_20px_42px_rgba(2,8,23,0.20)] [html[data-theme='light']_&]:border-sky-200/80 [html[data-theme='light']_&]:bg-[linear-gradient(135deg,rgba(14,165,233,0.18)_0%,rgba(56,189,248,0.14)_20%,rgba(239,246,255,0.98)_58%,rgba(241,245,249,1)_100%)] [html[data-theme='light']_&]:shadow-[0_16px_34px_rgba(15,23,42,0.10)]">
+        <div className="pointer-events-none absolute inset-0 opacity-40 [background:radial-gradient(circle_at_top_left,rgba(56,189,248,0.28),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.22),transparent_32%)] [html[data-theme='light']_&]:opacity-65" />
+        <div className="pointer-events-none absolute inset-0 opacity-20 [background:repeating-linear-gradient(135deg,rgba(255,255,255,0.08)_0_16px,rgba(255,255,255,0)_16px_32px)] [html[data-theme='light']_&]:opacity-10" />
+
+        <div className="relative max-w-2xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300 [html[data-theme='light']_&]:border-sky-500/25 [html[data-theme='light']_&]:bg-sky-500/10 [html[data-theme='light']_&]:text-sky-700">
+            Community Pulse
+          </span>
+
+          <h2 className="mt-4 max-w-xl text-3xl font-black leading-tight text-white [html[data-theme='light']_&]:text-slate-900 sm:text-[2.15rem]">
+            Browse the biggest fan conversations in one place
+          </h2>
+
+          <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300 [html[data-theme='light']_&]:text-slate-600 sm:text-[15px]">
+            You do not have a personalized feed yet, but you can still jump straight into team
+            communities and see what supporters across the league are talking about.
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/communities" className="btn-primary px-5">
+              Browse Communities
+            </Link>
+            <Link href="/login?next=%2F" className="btn-secondary">
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <EmptyStateCard
       title="Feed is quiet right now"
-      description={
-        isAuthenticated
-          ? "No fresh feed events yet. As new replies and team updates arrive, they will appear here."
-          : "Sign in to unlock your personalized stream."
-      }
+      description="No fresh feed events yet. As new replies and team updates arrive, they will appear here."
     />
-  );
-}
-
-function FeedPreviewBanner() {
-  return (
-    <div className="rounded-xl border border-sky-500/35 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">
-      No live feed events yet. Showing preview cards so you can review the design.
-    </div>
-  );
-}
-
-function FeedPreviewSecondaryBanner() {
-  return (
-    <div className="rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-      Showing additional mock discussion cards (non-match) so you can review their design.
-    </div>
   );
 }
 
@@ -972,7 +984,7 @@ export default function HomeFeedShell() {
   useEffect(() => {
     if (!session) {
       setFeedState({
-        items: GUEST_FEED_ITEMS,
+        items: [],
         status: "ready",
         errorMessage: null,
         page: 1,

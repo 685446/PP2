@@ -104,17 +104,20 @@ function SidebarContent({
   onNavigate?: () => void;
 }) {
   const mainItems = getVisibleItems(PRIMARY_NAV_ITEMS, auth);
-  const myAreaItems = getVisibleItems(SIDEBAR_MY_AREA_ITEMS, auth).map((item) => {
-    if (item.href !== "/my-team") return item;
-    if (!auth.isAuthenticated) return item;
-    if (!auth.favoriteTeamName || !auth.favoriteTeamId) return item;
-    return {
-      ...item,
-      label: auth.favoriteTeamName,
-      href: `/teams/${auth.favoriteTeamId}`,
-      iconUrl: auth.favoriteTeamCrestUrl ?? null,
-    };
-  });
+  const myAreaItems = getVisibleItems(SIDEBAR_MY_AREA_ITEMS, auth)
+    .filter((item) => {
+      if (item.href !== "/my-team") return true;
+      return Boolean(auth.isAuthenticated && auth.favoriteTeamName && auth.favoriteTeamId);
+    })
+    .map((item) => {
+      if (item.href !== "/my-team") return item;
+      return {
+        ...item,
+        label: auth.favoriteTeamName as string,
+        href: `/teams/${auth.favoriteTeamId}`,
+        iconUrl: auth.favoriteTeamCrestUrl ?? null,
+      };
+    });
   const utilityItems = getVisibleItems(SIDEBAR_UTILITY_ITEMS, auth);
 
   return (
