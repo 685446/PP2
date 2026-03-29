@@ -211,6 +211,7 @@ export async function GET(request: NextRequest) {
     const author = searchParams.get("author")?.trim() || null;
     const title = searchParams.get("title")?.trim() || null;
     const search = searchParams.get("search")?.trim() || null;
+    const hasPoll = searchParams.get("hasPoll");
     const tagsValues = [
       ...searchParams.getAll("tags").flatMap((value) => value.split(",")),
       ...searchParams.getAll("tag").flatMap((value) => value.split(",")),
@@ -288,9 +289,15 @@ export async function GET(request: NextRequest) {
     }
 
     const resolvedTitle = title || search;
+    const requirePoll = hasPoll === "1" || hasPoll === "true";
 
     const sharedWhere: Prisma.ThreadWhereInput = {
       isHidden: false,
+      ...(requirePoll && {
+        poll: {
+          isNot: null,
+        },
+      }),
       ...(teamId && { teamId: Number(teamId) }),
       ...(authorId && { authorId: Number(authorId) }),
       ...(team && {

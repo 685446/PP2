@@ -106,6 +106,7 @@ type FilterDraft = {
   team: string;
   tags: string;
   type: "ALL" | "GENERAL" | "TEAM" | "MATCH";
+  hasPoll: boolean;
 };
 
 type AppliedFilters = FilterDraft;
@@ -121,6 +122,7 @@ const INITIAL_FILTERS: AppliedFilters = {
   team: "",
   tags: "",
   type: "ALL",
+  hasPoll: false,
 };
 
 const TYPE_OPTIONS: AppliedFilters["type"][] = ["ALL", "GENERAL", "TEAM", "MATCH"];
@@ -235,6 +237,10 @@ function buildActiveFilterChips(
     chips.push({ key: "team", label: `Team: ${filters.team.trim()}` });
   }
 
+  if (filters.hasPoll) {
+    chips.push({ key: "hasPoll", label: "Has Poll" });
+  }
+
   filters.tags
     .split(",")
     .map((value) => value.trim())
@@ -285,6 +291,10 @@ function buildThreadsUrl(filters: AppliedFilters, page: number) {
 
   if (filters.tags.trim()) {
     params.set("tags", filters.tags.trim());
+  }
+
+  if (filters.hasPoll) {
+    params.set("hasPoll", "1");
   }
 
   return `/api/threads?${params.toString()}`;
@@ -547,6 +557,36 @@ function DiscussionsFiltersPanel({
         </label>
       </div>
 
+      <button
+        type="button"
+        onClick={() =>
+          setDraftFilters((current) => ({
+            ...current,
+            hasPoll: !current.hasPoll,
+          }))
+        }
+        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+          draftFilters.hasPoll
+            ? "border-sky-500 bg-sky-500/10 text-sky-600"
+            : "border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] text-[color:var(--foreground)]"
+        }`}
+        aria-pressed={draftFilters.hasPoll}
+      >
+        <span>Only Threads With Polls</span>
+        <span
+          className={`inline-flex h-6 w-11 items-center rounded-full px-1 transition ${
+            draftFilters.hasPoll ? "bg-sky-500/80" : "bg-[color:var(--surface-border)]"
+          }`}
+          aria-hidden="true"
+        >
+          <span
+            className={`h-4 w-4 rounded-full bg-white transition ${
+              draftFilters.hasPoll ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </span>
+      </button>
+
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Thread Type</p>
         <div className="grid grid-cols-2 gap-2">
@@ -705,6 +745,7 @@ export default function DiscussionsPage() {
     team: "",
     tags: "",
     type: "ALL",
+    hasPoll: false,
   });
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(INITIAL_FILTERS);
   const [threads, setThreads] = useState<ThreadRecord[]>([]);
@@ -917,6 +958,7 @@ export default function DiscussionsPage() {
       team: "",
       tags: "",
       type: "ALL",
+      hasPoll: false,
     });
     setPageInput("1");
     setCurrentPage(1);

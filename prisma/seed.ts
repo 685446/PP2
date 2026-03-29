@@ -19,8 +19,30 @@ function recentDate(daysAgo: number, hour: number, minute = 0) {
   return date;
 }
 
+function futureDate(daysAhead: number, hour: number, minute = 0) {
+  const date = new Date();
+  date.setSeconds(0, 0);
+  date.setHours(hour, minute, 0, 0);
+  date.setDate(date.getDate() + daysAhead);
+  return date;
+}
+
 function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60_000);
+}
+
+function avatarForIndex(index: number) {
+  return `/avatars/default${(index % 6) + 1}.png`;
+}
+
+function compactThreadLabel(title: string) {
+  return title
+    .replace(/[^a-z0-9 ]/gi, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" ")
+    .toLowerCase();
 }
 
 function nextPostTimestamp(threadId: number) {
@@ -65,6 +87,82 @@ async function ensurePost(data: {
       createdAt,
     },
   });
+}
+
+async function ensureEditedPost(data: {
+  originalContent: string;
+  content: string;
+  threadId: number;
+  authorId: number;
+  parentId?: number | null;
+  createdAt?: Date;
+  editHistory?: Array<{
+    content: string;
+    editedAt: Date;
+  }>;
+}) {
+  const createdAt = data.createdAt ?? nextPostTimestamp(data.threadId);
+  const knownContents = Array.from(
+    new Set([
+      data.originalContent,
+      data.content,
+      ...(data.editHistory?.map((entry) => entry.content) ?? []),
+    ])
+  );
+
+  const existing = await prisma.post.findFirst({
+    where: {
+      threadId: data.threadId,
+      authorId: data.authorId,
+      parentId: data.parentId ?? null,
+      OR: knownContents.map((content) => ({ content })),
+    },
+  });
+
+  const post = existing
+    ? await prisma.post.update({
+        where: { id: existing.id },
+        data: {
+          content: data.content,
+          createdAt,
+        },
+      })
+    : await prisma.post.create({
+        data: {
+          content: data.content,
+          threadId: data.threadId,
+          authorId: data.authorId,
+          parentId: data.parentId ?? null,
+          createdAt,
+        },
+      });
+
+  for (const edit of data.editHistory ?? []) {
+    const existingEdit = await prisma.postEdit.findFirst({
+      where: {
+        postId: post.id,
+        content: edit.content,
+      },
+    });
+
+    if (existingEdit) {
+      await prisma.postEdit.update({
+        where: { id: existingEdit.id },
+        data: { editedAt: edit.editedAt },
+      });
+      continue;
+    }
+
+    await prisma.postEdit.create({
+      data: {
+        postId: post.id,
+        content: edit.content,
+        editedAt: edit.editedAt,
+      },
+    });
+  }
+
+  return post;
 }
 
 async function resolveForumTeam(data: {
@@ -132,6 +230,86 @@ async function ensureThread(data: {
   return thread;
 }
 
+async function ensurePoll(data: {
+  threadId: number;
+  authorId: number;
+  question: string;
+  deadline: Date;
+  options: string[];
+}) {
+  const existing = await prisma.poll.findUnique({
+    where: { threadId: data.threadId },
+    include: {
+      options: true,
+    },
+  });
+
+  const poll = existing
+    ? await prisma.poll.update({
+        where: { id: existing.id },
+        data: {
+          authorId: data.authorId,
+          question: data.question,
+          deadline: data.deadline,
+        },
+        include: {
+          options: true,
+        },
+      })
+    : await prisma.poll.create({
+        data: {
+          threadId: data.threadId,
+          authorId: data.authorId,
+          question: data.question,
+          deadline: data.deadline,
+        },
+        include: {
+          options: true,
+        },
+      });
+
+  const optionMap = new Map(poll.options.map((option) => [option.text, option]));
+
+  for (const optionText of data.options) {
+    const trimmed = optionText.trim();
+    if (!trimmed || optionMap.has(trimmed)) continue;
+
+    const option = await prisma.pollOption.create({
+      data: {
+        pollId: poll.id,
+        text: trimmed,
+      },
+    });
+    optionMap.set(trimmed, option);
+  }
+
+  return {
+    poll,
+    options: data.options
+      .map((optionText) => optionMap.get(optionText.trim()))
+      .filter((option): option is NonNullable<typeof option> => Boolean(option)),
+  };
+}
+
+async function ensurePollVote(data: {
+  userId: number;
+  pollOptionId: number;
+}) {
+  return prisma.pollVote.upsert({
+    where: {
+      userId_pollOptionId: {
+        userId: data.userId,
+        pollOptionId: data.pollOptionId,
+      },
+    },
+    update: {},
+    create: {
+      userId: data.userId,
+      pollOptionId: data.pollOptionId,
+    },
+  });
+}
+
 async function ensureFollow(data: {
   followerId: number;
   followingId: number;
@@ -150,6 +328,77 @@ async function ensureFollow(data: {
     create: {
       followerId: data.followerId,
       followingId: data.followingId,
+      createdAt: data.createdAt,
+    },
+  });
+}
+
+async function ensureAppeal(data: {
+  userId: number;
+  reason: string;
+  status?: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: Date;
+}) {
+  const existing = await prisma.appeal.findFirst({
+    where: {
+      userId: data.userId,
+      reason: data.reason,
+    },
+  });
+
+  if (existing) {
+    return prisma.appeal.update({
+      where: { id: existing.id },
+      data: {
+        status: data.status ?? "PENDING",
+        createdAt: data.createdAt,
+      },
+    });
+  }
+
+  return prisma.appeal.create({
+    data: {
+      userId: data.userId,
+      reason: data.reason,
+      status: data.status ?? "PENDING",
+      createdAt: data.createdAt,
+    },
+  });
+}
+
+async function ensureUserReport(data: {
+  reporterId: number;
+  reportedUserId: number;
+  reason: string;
+  status?: "PENDING" | "APPROVED" | "DISMISSED";
+  createdAt: Date;
+}) {
+  const existing = await prisma.report.findFirst({
+    where: {
+      reporterId: data.reporterId,
+      targetType: "USER",
+      reportedUserId: data.reportedUserId,
+      reason: data.reason,
+    },
+  });
+
+  if (existing) {
+    return prisma.report.update({
+      where: { id: existing.id },
+      data: {
+        status: data.status ?? "PENDING",
+        createdAt: data.createdAt,
+      },
+    });
+  }
+
+  return prisma.report.create({
+    data: {
+      reporterId: data.reporterId,
+      targetType: "USER",
+      reportedUserId: data.reportedUserId,
+      reason: data.reason,
+      status: data.status ?? "PENDING",
       createdAt: data.createdAt,
     },
   });
@@ -227,7 +476,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default1.png",
+        avatar: "/avatars/default2.png",
         createdAt: joinedAt.harry,
       },
     }),
@@ -242,7 +491,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default2.png",
+        avatar: "/avatars/default3.png",
         createdAt: joinedAt.emily,
       },
     }),
@@ -257,7 +506,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default3.png",
+        avatar: "/avatars/default4.png",
         createdAt: joinedAt.james,
       },
     }),
@@ -272,7 +521,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default1.png",
+        avatar: "/avatars/default5.png",
         createdAt: joinedAt.sara,
       },
     }),
@@ -287,7 +536,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default2.png",
+        avatar: "/avatars/default6.png",
         createdAt: joinedAt.mike,
       },
     }),
@@ -302,7 +551,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default3.png",
+        avatar: "/avatars/default1.png",
         createdAt: joinedAt.lena,
       },
     }),
@@ -317,7 +566,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default1.png",
+        avatar: "/avatars/default2.png",
         createdAt: joinedAt.tom,
       },
     }),
@@ -332,7 +581,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default2.png",
+        avatar: "/avatars/default3.png",
         createdAt: joinedAt.aisha,
       },
     }),
@@ -347,7 +596,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default3.png",
+        avatar: "/avatars/default4.png",
         createdAt: joinedAt.nina,
       },
     }),
@@ -362,7 +611,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default1.png",
+        avatar: "/avatars/default5.png",
         createdAt: joinedAt.omar,
       },
     }),
@@ -377,7 +626,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default2.png",
+        avatar: "/avatars/default6.png",
         createdAt: joinedAt.priya,
       },
     }),
@@ -392,7 +641,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default3.png",
+        avatar: "/avatars/default1.png",
         createdAt: joinedAt.leo,
       },
     }),
@@ -407,7 +656,7 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default1.png",
+        avatar: "/avatars/default2.png",
         createdAt: joinedAt.maya,
       },
     }),
@@ -422,13 +671,13 @@ async function main() {
         passwordHash,
         role: "USER",
         status: "ACTIVE",
-        avatar: "/avatars/default2.png",
+        avatar: "/avatars/default3.png",
         createdAt: joinedAt.noah,
       },
     }),
   ]);
 
-  console.log(`Ensured ${users.length + 2} users`);
+  console.log(`Ensured ${users.length + 2} base users`);
   console.log(`System bot profile: ${SYSTEM_USER_USERNAME} — ${SYSTEM_USER_BIO}`);
 
   // ─── Tags ────────────────────────────────────────────────────────────────
@@ -495,7 +744,264 @@ async function main() {
       .filter((team): team is NonNullable<typeof team> => Boolean(team))
       .map((team) => [team.name, team])
   );
+  const allTeams = await prisma.team.findMany({
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+    },
+    orderBy: { id: "asc" },
+  });
+  const favoriteTeamIds = allTeams.map((team) => team.id);
   console.log(`Resolved ${Object.keys(teamMap).length} synced teams for demo team threads`);
+
+  if (favoriteTeamIds.length > 0) {
+    const namedFavoriteTeamIds = [
+      teamMap["Tottenham Hotspur FC"]?.id ?? favoriteTeamIds[0],
+      teamMap["Liverpool FC"]?.id ?? favoriteTeamIds[1 % favoriteTeamIds.length],
+      teamMap["Chelsea FC"]?.id ?? favoriteTeamIds[2 % favoriteTeamIds.length],
+      teamMap["Arsenal FC"]?.id ?? favoriteTeamIds[3 % favoriteTeamIds.length],
+      teamMap["Liverpool FC"]?.id ?? favoriteTeamIds[4 % favoriteTeamIds.length],
+      teamMap["Chelsea FC"]?.id ?? favoriteTeamIds[5 % favoriteTeamIds.length],
+      teamMap["Tottenham Hotspur FC"]?.id ?? favoriteTeamIds[0],
+      teamMap["Manchester City FC"]?.id ?? favoriteTeamIds[1 % favoriteTeamIds.length],
+      teamMap["Arsenal FC"]?.id ?? favoriteTeamIds[2 % favoriteTeamIds.length],
+      teamMap["Liverpool FC"]?.id ?? favoriteTeamIds[3 % favoriteTeamIds.length],
+      teamMap["Newcastle United FC"]?.id ?? favoriteTeamIds[4 % favoriteTeamIds.length],
+      teamMap["Manchester City FC"]?.id ?? favoriteTeamIds[5 % favoriteTeamIds.length],
+      teamMap["Arsenal FC"]?.id ?? favoriteTeamIds[0],
+      teamMap["Liverpool FC"]?.id ?? favoriteTeamIds[1 % favoriteTeamIds.length],
+    ];
+
+    await Promise.all(
+      users.map((user, index) =>
+        prisma.user.update({
+          where: { id: user.id },
+          data: {
+            favoriteTeamId: namedFavoriteTeamIds[index % namedFavoriteTeamIds.length] ?? null,
+          },
+        })
+      )
+    );
+
+    const supporterPrefixes = [
+      "North",
+      "South",
+      "East",
+      "West",
+      "Rapid",
+      "Calm",
+      "Sharp",
+      "Loud",
+      "Bright",
+      "Swift",
+      "True",
+      "Bold",
+    ];
+    const supporterSuffixes = [
+      "Press",
+      "Pivot",
+      "Volley",
+      "Terrace",
+      "Tackle",
+      "Tempo",
+      "Cross",
+    ];
+
+    const generatedUsers = await Promise.all(
+      supporterPrefixes.flatMap((prefix, prefixIndex) =>
+        supporterSuffixes.map((suffix, suffixIndex) => {
+          const index = prefixIndex * supporterSuffixes.length + suffixIndex;
+          const tag = String(index + 1).padStart(2, "0");
+          const mostlyRecentDaysAgo =
+            index < 60 ? index % 14 : 14 + ((index - 60) % 46) + 1;
+          const createdAt = recentDate(
+            mostlyRecentDaysAgo,
+            9 + (index % 11),
+            (index * 7) % 60
+          );
+
+          return prisma.user.upsert({
+            where: { email: `supporter${tag}@sportsdeck.com` },
+            update: {
+              createdAt,
+              favoriteTeamId: favoriteTeamIds[index % favoriteTeamIds.length] ?? null,
+            },
+            create: {
+              email: `supporter${tag}@sportsdeck.com`,
+              username: `${prefix}${suffix}${tag}`,
+              passwordHash,
+              role: "USER",
+              status: "ACTIVE",
+              avatar: avatarForIndex(index),
+              favoriteTeamId: favoriteTeamIds[index % favoriteTeamIds.length] ?? null,
+              createdAt,
+            },
+          });
+        })
+      )
+    );
+
+    users.push(...generatedUsers);
+  }
+
+  if (favoriteTeamIds.length > 0) {
+    await Promise.all([
+      prisma.user.update({
+        where: { email: "supporter07@sportsdeck.com" },
+        data: {
+          status: "SUSPENDED",
+          statusReason: "Repeated spam reports from multiple communities.",
+          suspendedUntil: futureDate(14, 18, 0),
+        },
+      }),
+      prisma.user.update({
+        where: { email: "supporter18@sportsdeck.com" },
+        data: {
+          status: "SUSPENDED",
+          statusReason: "Harassment warnings escalated into a temporary suspension.",
+          suspendedUntil: futureDate(14, 12, 30),
+        },
+      }),
+      prisma.user.update({
+        where: { email: "supporter41@sportsdeck.com" },
+        data: {
+          status: "SUSPENDED",
+          statusReason: "Flooded match threads with duplicate promotional posts.",
+          suspendedUntil: futureDate(14, 20, 15),
+        },
+      }),
+      prisma.user.update({
+        where: { email: "supporter63@sportsdeck.com" },
+        data: {
+          status: "BANNED",
+          statusReason: "Permanent ban after repeated abusive account-level reports.",
+          suspendedUntil: null,
+        },
+      }),
+      prisma.user.update({
+        where: { email: "supporter79@sportsdeck.com" },
+        data: {
+          status: "BANNED",
+          statusReason: "Ban applied for persistent impersonation and spam behavior.",
+          suspendedUntil: null,
+        },
+      }),
+    ]);
+
+    const appealedUsers = await prisma.user.findMany({
+      where: {
+        email: {
+          in: [
+            "supporter07@sportsdeck.com",
+            "supporter18@sportsdeck.com",
+            "supporter63@sportsdeck.com",
+            "supporter79@sportsdeck.com",
+          ],
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+    const appealUserByEmail = new Map(appealedUsers.map((user) => [user.email, user.id]));
+    const reportUsers = await prisma.user.findMany({
+      where: {
+        email: {
+          in: [
+            "harry@sportsdeck.com",
+            "emily@sportsdeck.com",
+            "james@sportsdeck.com",
+            "sara@sportsdeck.com",
+            "mike@sportsdeck.com",
+            "lena@sportsdeck.com",
+            "supporter07@sportsdeck.com",
+            "supporter18@sportsdeck.com",
+            "supporter41@sportsdeck.com",
+            "supporter63@sportsdeck.com",
+            "supporter79@sportsdeck.com",
+          ],
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+    const reportUserByEmail = new Map(reportUsers.map((user) => [user.email, user.id]));
+
+    await Promise.all([
+      ensureAppeal({
+        userId: appealUserByEmail.get("supporter07@sportsdeck.com")!,
+        reason: "I know I posted too quickly during live matches, but I have stopped and would appreciate another chance after the warning period.",
+        status: "PENDING",
+        createdAt: recentDate(2, 11, 10),
+      }),
+      ensureAppeal({
+        userId: appealUserByEmail.get("supporter18@sportsdeck.com")!,
+        reason: "The suspension is fair, but I am appealing to explain the argument came from one heated thread and not repeated targeting.",
+        status: "PENDING",
+        createdAt: recentDate(1, 16, 20),
+      }),
+      ensureAppeal({
+        userId: appealUserByEmail.get("supporter63@sportsdeck.com")!,
+        reason: "I understand the account was banned, but I am asking for a review because I was using a parody account and not trying to impersonate anyone maliciously.",
+        status: "REJECTED",
+        createdAt: recentDate(11, 13, 45),
+      }),
+      ensureAppeal({
+        userId: appealUserByEmail.get("supporter79@sportsdeck.com")!,
+        reason: "I accept the spam findings and would be willing to return under stricter limits if the ban can be reconsidered.",
+        status: "PENDING",
+        createdAt: recentDate(3, 10, 35),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("harry@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter07@sportsdeck.com")!,
+        reason: "Repeated spammy comments across multiple live match threads.",
+        status: "PENDING",
+        createdAt: recentDate(6, 21, 5),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("emily@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter18@sportsdeck.com")!,
+        reason: "Escalated into direct harassment after a disagreement in a team thread.",
+        status: "PENDING",
+        createdAt: recentDate(4, 18, 15),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("james@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter41@sportsdeck.com")!,
+        reason: "Flooded the forum with duplicate promotional replies during the weekend fixtures.",
+        status: "PENDING",
+        createdAt: recentDate(2, 20, 20),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("sara@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter63@sportsdeck.com")!,
+        reason: "Account kept impersonating club staff and doubling down after warnings.",
+        status: "APPROVED",
+        createdAt: recentDate(13, 14, 40),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("mike@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter79@sportsdeck.com")!,
+        reason: "Persistent spam behavior and suspicious copy-paste posts in several communities.",
+        status: "APPROVED",
+        createdAt: recentDate(9, 19, 55),
+      }),
+      ensureUserReport({
+        reporterId: reportUserByEmail.get("lena@sportsdeck.com")!,
+        reportedUserId: reportUserByEmail.get("supporter18@sportsdeck.com")!,
+        reason: "Kept returning to the same user with targeted replies after being asked to stop.",
+        status: "PENDING",
+        createdAt: recentDate(1, 11, 45),
+      }),
+    ]);
+  }
+
+  console.log(`Expanded seeded users to ${users.length + 2} total accounts`);
   const threadTimeline = {
     seasonDiscussion: recentDate(31, 20, 10),
     januaryWindow: recentDate(28, 18, 55),
@@ -1015,6 +1521,106 @@ async function main() {
   const extraTeamThreads = await Promise.all(
     extraTeamThreadConfigs.map((config) => ensureThread(config, tagMap))
   );
+  const generatedGeneralTopics = [
+    "Pressing triggers that changed a match",
+    "One tactical tweak that instantly worked",
+    "The cleanest midfield balance this week",
+    "Which attack looks most repeatable",
+    "Overperforming teams we still believe in",
+    "Underperforming sides still worth backing",
+    "A lineup call you would keep making",
+    "The bench option you trust most",
+    "Best in-game adjustment from the weekend",
+    "Who looks built for the run-in",
+    "Most watchable team right now",
+    "Who is quietly controlling matches",
+  ];
+  const generatedGeneralAngles = [
+    "from the weekend",
+    "heading into the run-in",
+    "after this matchweek",
+    "with two months left",
+    "since the last international break",
+    "after the latest title-race swing",
+    "based on recent form",
+    "before the next fixture pile-up",
+    "from the last two weeks",
+    "as the table tightens",
+  ];
+  const generatedTagSets: string[][] = [
+    ["premier-league", "matchday"],
+    ["tactics", "premier-league"],
+    ["fixtures", "matchday"],
+    ["top4", "premier-league"],
+    ["underrated", "premier-league"],
+    ["defence", "tactics"],
+    ["manager", "premier-league"],
+    ["champions-league", "top4"],
+  ];
+
+  const generatedGeneralThreads = await Promise.all(
+    Array.from({ length: 120 }, (_, index) => {
+      const topic = generatedGeneralTopics[index % generatedGeneralTopics.length];
+      const angle = generatedGeneralAngles[Math.floor(index / generatedGeneralTopics.length) % generatedGeneralAngles.length];
+      const daysAgo = index < 90 ? index % 14 : 14 + ((index - 90) % 46) + 1;
+      const createdAt = recentDate(daysAgo, 9 + (index % 11), (index * 5) % 60);
+      const tagNames = generatedTagSets[index % generatedTagSets.length];
+
+      return ensureThread(
+        {
+          title: `${topic} ${angle}`,
+          body: `Fresh thread ${index + 1}: pull apart the patterns, players, and decisions behind ${topic.toLowerCase()} ${angle}. Keep it specific to recent form and actual performances.`,
+          type: "GENERAL",
+          authorId: users[index % users.length].id,
+          openAt: createdAt,
+          createdAt,
+          tagNames,
+        },
+        tagMap
+      );
+    })
+  );
+
+  const generatedTeamThreads = favoriteTeamIds.length
+    ? await Promise.all(
+        Array.from({ length: 70 }, (_, index) => {
+          const team = allTeams[index % allTeams.length];
+          const createdAt = recentDate(
+            index < 50 ? index % 14 : 14 + ((index - 50) % 46) + 1,
+            10 + (index % 10),
+            (index * 9) % 60
+          );
+          const teamLabels = [
+            "Weekly fan check-in",
+            "Selection headache discussion",
+            "Run-in confidence meter",
+            "Summer needs brainstorm",
+            "Three things we learned lately",
+            "Who deserves more minutes",
+            "What still needs fixing",
+          ];
+          const bodyLabels = [
+            "Talk recent form, lineup decisions, and the one issue supporters keep circling back to.",
+            "Keep it to the last couple of weeks: what improved, what slipped, and what still feels unresolved?",
+            "Use this space for team-specific reactions, worries, and realistic optimism.",
+          ];
+
+          return ensureThread(
+            {
+              title: `${team.shortName || team.name} ${teamLabels[Math.floor(index / allTeams.length) % teamLabels.length]}`,
+              body: `${team.name} thread ${index + 1}. ${bodyLabels[index % bodyLabels.length]}`,
+              type: "TEAM",
+              authorId: users[(index + 17) % users.length].id,
+              teamId: team.id,
+              openAt: createdAt,
+              createdAt,
+              tagNames: generatedTagSets[(index + 3) % generatedTagSets.length],
+            },
+            tagMap
+          );
+        })
+      )
+    : [];
   const threadByTitle = new Map(
     [...extraGeneralThreads, ...extraTeamThreads].map((thread) => [thread.title, thread])
   );
@@ -1039,7 +1645,7 @@ async function main() {
   const citySupportersThread = threadByTitle.get("Man City Supporters Corner");
   const newcastleSupportersThread = threadByTitle.get("Newcastle Supporters Corner");
 
-  [
+  const allDiscussionThreads = [
     thread1,
     thread2,
     thread3,
@@ -1054,11 +1660,32 @@ async function main() {
     thread12,
     ...extraGeneralThreads,
     ...extraTeamThreads,
-  ].forEach((thread) => {
+    ...generatedGeneralThreads,
+    ...generatedTeamThreads,
+  ];
+
+  allDiscussionThreads.forEach((thread) => {
     seededThreadCreatedAt.set(thread.id, thread.createdAt);
   });
 
-  console.log(`Ensured ${12 + extraGeneralThreads.length + extraTeamThreads.length} general/team threads`);
+  console.log(
+    `Ensured ${
+      12 +
+      extraGeneralThreads.length +
+      extraTeamThreads.length +
+      generatedGeneralThreads.length +
+      generatedTeamThreads.length
+    } general/team threads`
+  );
+
+  const restrictedEmails = new Set([
+    "supporter07@sportsdeck.com",
+    "supporter18@sportsdeck.com",
+    "supporter41@sportsdeck.com",
+    "supporter63@sportsdeck.com",
+    "supporter79@sportsdeck.com",
+  ]);
+  const activeSeedUsers = users.filter((user) => !restrictedEmails.has(user.email));
 
   // ─── Posts ───────────────────────────────────────────────────────────────
   const p1 = await ensurePost({
@@ -1795,6 +2422,413 @@ async function main() {
   ].filter(Boolean);
 
   console.log(`Ensured ${replies.length} replies`);
+
+  const multilingualComments = [
+    "Creo que este hilo se entiende mejor si miramos cómo cambió el partido después del descanso.",
+    "Franchement, ce débat devient bien plus intéressant quand on compare les ajustements sans ballon.",
+    "Ich finde, man erkennt die wahre Qualität einer Mannschaft erst daran, wie ruhig sie nach dem Gegentor bleibt.",
+    "Para mim, a diferença está na tomada de decisão nos últimos quinze minutos.",
+    "Secondo me questa squadra cresce tantissimo quando il ritmo della partita si spezza.",
+    "Volgens mij zie je pas echt structuur wanneer een ploeg onder druk toch hetzelfde idee blijft volgen.",
+    "برأيي النقطة الأهم هنا هي كيف تغيّر إيقاع المباراة بعد أول تبديل.",
+    "この流れを見ると、後半の立ち位置の修正が勝負を分けたと思います。",
+    "제 생각에는 이 장면보다도 그 이후의 압박 강도가 더 중요했어요.",
+    "मेरे हिसाब से असली फर्क यह था कि टीम ने दबाव में भी अपनी बनावट नहीं छोड़ी।",
+  ];
+  const topLevelTemplates = [
+    "The bit I keep circling back to in %thread% is how the control changes once the tempo rises.",
+    "This thread mostly confirms my feeling that %thread% comes down to who handles second balls better.",
+    "My honest takeaway from %thread% is that the shape matters more than the star names.",
+    "I like the talent involved here, but %thread% still feels like a spacing conversation first.",
+    "If %thread% tells us anything, it is that small adjustments have decided more than headline moments.",
+    "Watching %thread% again, I keep noticing how much cleaner the good teams are between the boxes.",
+  ];
+  const replyTemplates = [
+    "That is fair, but I think the bigger swing came from the out-of-possession structure, not the finishing.",
+    "I get that angle. The one thing I would add is that the rhythm changed the second the midfield distances opened up.",
+    "Completely with you on the broad point, although I still think game state explains half of it.",
+    "That reads right to me. The press looked coordinated early and much looser once the match stretched.",
+    "Same here. The details around the full-backs and rest defence make the whole thing easier to understand.",
+    "I had the same reaction, especially once the benches started changing the matchup on that side.",
+  ];
+  const nestedReplyTemplates = [
+    "Exactly, and that is why I would separate the tactical idea from the emotional momentum.",
+    "That is the key distinction for me too. The intent stayed the same even when execution got messy.",
+    "Yes, and it is probably why the thread feels more balanced than the final scoreline suggests.",
+    "Agreed. Once you watch the sequence back, the adjustment looks deliberate rather than accidental.",
+    "That is where I landed as well. The pattern was there long before the highlight everyone remembers.",
+  ];
+
+  let generatedTopLevelComments = 0;
+  let generatedReplyComments = 0;
+  let generatedNestedComments = 0;
+  let generatedEditedComments = 0;
+  let multilingualCursor = 0;
+
+  for (const [threadIndex, thread] of allDiscussionThreads.entries()) {
+    const totalGeneratedComments = thread.id % 11;
+    if (totalGeneratedComments === 0) continue;
+
+    const label = compactThreadLabel(thread.title);
+    const topLevelCount = Math.min(3, Math.max(1, Math.floor((totalGeneratedComments + 2) / 4)));
+    const topLevelPostsForThread = [];
+
+    for (let slot = 0; slot < topLevelCount; slot += 1) {
+      const author = activeSeedUsers[(thread.id + slot * 7 + threadIndex) % activeSeedUsers.length];
+      const createdAt = nextPostTimestamp(thread.id);
+      const multilingualContent =
+        multilingualCursor < multilingualComments.length && slot === 0
+          ? multilingualComments[multilingualCursor]
+          : null;
+      const finalContent =
+        multilingualContent ??
+        topLevelTemplates[(thread.id + slot) % topLevelTemplates.length].replaceAll("%thread%", label);
+
+      const shouldEditTopLevel =
+        !multilingualContent && (thread.id + slot) % 6 === 0;
+      const post = shouldEditTopLevel
+        ? await ensureEditedPost({
+            originalContent: `${finalContent} I am still not fully sure about the last phase, though.`,
+            content: `${finalContent} The more I watch it, the clearer that final phase becomes.`,
+            threadId: thread.id,
+            authorId: author.id,
+            createdAt,
+            editHistory: [
+              {
+                content: `${finalContent} I am still not fully sure about the last phase, though.`,
+                editedAt: addMinutes(createdAt, 26 + ((thread.id + slot) % 11)),
+              },
+            ],
+          })
+        : await ensurePost({
+            content: finalContent,
+            threadId: thread.id,
+            authorId: author.id,
+            createdAt,
+          });
+
+      if (multilingualContent) {
+        multilingualCursor += 1;
+      }
+      if (shouldEditTopLevel) {
+        generatedEditedComments += 1;
+      }
+
+      generatedTopLevelComments += 1;
+      topLevelPostsForThread.push(post);
+    }
+
+    let remainingReplies = totalGeneratedComments - topLevelCount;
+    const replyRoots = [];
+
+    if (remainingReplies > 0 && topLevelPostsForThread.length > 0) {
+      const firstParent = topLevelPostsForThread[0];
+      const firstReplyAuthor =
+        activeSeedUsers[(thread.id + 19 + threadIndex) % activeSeedUsers.length];
+      const firstReplyCreatedAt = nextPostTimestamp(thread.id);
+      const firstReply = await ensurePost({
+        content: replyTemplates[(thread.id + threadIndex) % replyTemplates.length],
+        threadId: thread.id,
+        authorId: firstReplyAuthor.id,
+        parentId: firstParent.id,
+        createdAt: firstReplyCreatedAt,
+      });
+      generatedReplyComments += 1;
+      remainingReplies -= 1;
+      replyRoots.push(firstReply);
+    }
+
+    if (remainingReplies > 0 && replyRoots.length > 0) {
+      const nestedParent = replyRoots[0];
+      const nestedAuthor =
+        activeSeedUsers[(thread.id + 31 + threadIndex) % activeSeedUsers.length];
+      const nestedCreatedAt = nextPostTimestamp(thread.id);
+      const shouldEditNested = thread.id % 9 === 0;
+      await (shouldEditNested
+        ? ensureEditedPost({
+            originalContent: `${nestedReplyTemplates[(thread.id + 1) % nestedReplyTemplates.length]} I posted too quickly the first time.`,
+            content: `${nestedReplyTemplates[(thread.id + 1) % nestedReplyTemplates.length]} I went back and rewrote this once the sequence made more sense.`,
+            threadId: thread.id,
+            authorId: nestedAuthor.id,
+            parentId: nestedParent.id,
+            createdAt: nestedCreatedAt,
+            editHistory: [
+              {
+                content: `${nestedReplyTemplates[(thread.id + 1) % nestedReplyTemplates.length]} I posted too quickly the first time.`,
+                editedAt: addMinutes(nestedCreatedAt, 14 + (thread.id % 9)),
+              },
+            ],
+          })
+        : ensurePost({
+            content: nestedReplyTemplates[(thread.id + 1) % nestedReplyTemplates.length],
+            threadId: thread.id,
+            authorId: nestedAuthor.id,
+            parentId: nestedParent.id,
+            createdAt: nestedCreatedAt,
+          }));
+      if (shouldEditNested) {
+        generatedEditedComments += 1;
+      }
+      generatedNestedComments += 1;
+      remainingReplies -= 1;
+    }
+
+    let replyCursor = 0;
+    while (remainingReplies > 0 && topLevelPostsForThread.length > 0) {
+      const parent = topLevelPostsForThread[replyCursor % topLevelPostsForThread.length];
+      const author =
+        activeSeedUsers[(thread.id + 43 + replyCursor + threadIndex) % activeSeedUsers.length];
+      const createdAt = nextPostTimestamp(thread.id);
+      const shouldEditReply =
+        remainingReplies % 3 === 0 && (thread.id + replyCursor) % 8 === 0;
+
+      await (shouldEditReply
+        ? ensureEditedPost({
+            originalContent: `${replyTemplates[(thread.id + replyCursor + 2) % replyTemplates.length]} I probably overstated it at first.`,
+            content: `${replyTemplates[(thread.id + replyCursor + 2) % replyTemplates.length]} Looking back, the first half matters a bit less than I initially thought.`,
+            threadId: thread.id,
+            authorId: author.id,
+            parentId: parent.id,
+            createdAt,
+            editHistory: [
+              {
+                content: `${replyTemplates[(thread.id + replyCursor + 2) % replyTemplates.length]} I probably overstated it at first.`,
+                editedAt: addMinutes(createdAt, 12 + ((thread.id + replyCursor) % 10)),
+              },
+            ],
+          })
+        : ensurePost({
+            content:
+              replyTemplates[(thread.id + replyCursor + 2) % replyTemplates.length],
+            threadId: thread.id,
+            authorId: author.id,
+            parentId: parent.id,
+            createdAt,
+          }));
+
+      if (shouldEditReply) {
+        generatedEditedComments += 1;
+      }
+      generatedReplyComments += 1;
+      remainingReplies -= 1;
+      replyCursor += 1;
+    }
+  }
+
+  console.log(
+    `Generated ${generatedTopLevelComments} top-level comments, ${generatedReplyComments} replies, and ${generatedNestedComments} nested replies across all threads`
+  );
+  console.log(
+    `Added ${generatedEditedComments} edited comments and ${multilingualCursor} multilingual comments`
+  );
+
+  const matchThreads = await prisma.thread.findMany({
+    where: {
+      type: "MATCH",
+      isHidden: false,
+      match: {
+        isNot: null,
+      },
+    },
+    include: {
+      match: {
+        include: {
+          homeTeam: {
+            select: { id: true, name: true, shortName: true },
+          },
+          awayTeam: {
+            select: { id: true, name: true, shortName: true },
+          },
+        },
+      },
+    },
+    orderBy: [{ openAt: "asc" }, { id: "asc" }],
+    take: 2,
+  });
+
+  if (matchThreads.length > 0) {
+    const positiveTemplates = [
+      "What a brilliant performance from %team%. The shape, intensity, and confidence have been outstanding.",
+      "%team% have looked sharp all night. This is the kind of display that makes supporters believe again.",
+      "So impressed by %team% here. The pressing and composure have both been excellent.",
+      "%team% deserved that moment. They have been the better side and the energy has been fantastic.",
+      "This is such a strong showing from %team%. Every good phase feels intentional and well-drilled.",
+    ];
+    const negativeTemplates = [
+      "%team% have been really frustrating to watch. Too many sloppy decisions and not enough control.",
+      "This has been a rough outing for %team%. They look flat, predictable, and second-best in every duel.",
+      "Hard to defend %team% tonight. The structure has been messy and the performance feels poor.",
+      "%team% have offered almost nothing going forward. It has been an ugly, disappointing display.",
+      "This is one of %team%'s weaker performances lately. Everything feels rushed and out of sync.",
+    ];
+
+    let seededMatchSentimentPosts = 0;
+
+    for (const [index, thread] of matchThreads.entries()) {
+      if (!thread.match) continue;
+
+      const homeSupporters = activeSeedUsers.filter(
+        (user) => user.favoriteTeamId === thread.match?.homeTeam.id
+      );
+      const awaySupporters = activeSeedUsers.filter(
+        (user) => user.favoriteTeamId === thread.match?.awayTeam.id
+      );
+
+      if (homeSupporters.length === 0 || awaySupporters.length === 0) {
+        continue;
+      }
+
+      seededThreadCreatedAt.set(thread.id, thread.createdAt);
+
+      const homePositive = index % 2 === 0;
+      const homeTemplates = homePositive ? positiveTemplates : negativeTemplates;
+      const awayTemplates = homePositive ? negativeTemplates : positiveTemplates;
+      const homeTeamLabel = thread.match.homeTeam.shortName || thread.match.homeTeam.name;
+      const awayTeamLabel = thread.match.awayTeam.shortName || thread.match.awayTeam.name;
+      const perSideCount = 4;
+
+      for (let slot = 0; slot < perSideCount; slot += 1) {
+        const homeAuthor = homeSupporters[slot % homeSupporters.length];
+        const awayAuthor = awaySupporters[slot % awaySupporters.length];
+
+        const homePost = await ensurePost({
+          content: homeTemplates[(thread.id + slot) % homeTemplates.length].replaceAll(
+            "%team%",
+            homeTeamLabel
+          ),
+          threadId: thread.id,
+          authorId: homeAuthor.id,
+          createdAt: nextPostTimestamp(thread.id),
+        });
+        seededMatchSentimentPosts += 1;
+
+        const awayPost = await ensurePost({
+          content: awayTemplates[(thread.id + slot + 1) % awayTemplates.length].replaceAll(
+            "%team%",
+            awayTeamLabel
+          ),
+          threadId: thread.id,
+          authorId: awayAuthor.id,
+          createdAt: nextPostTimestamp(thread.id),
+        });
+        seededMatchSentimentPosts += 1;
+
+        if (slot < 2) {
+          await ensurePost({
+            content: homePositive
+              ? "The momentum has felt real from kickoff. Even the quieter stretches have looked under control."
+              : "I wanted more fight than this. The game has felt like it is drifting away every few minutes.",
+            threadId: thread.id,
+            authorId: homeAuthor.id,
+            parentId: homePost.id,
+            createdAt: nextPostTimestamp(thread.id),
+          });
+          seededMatchSentimentPosts += 1;
+
+          await ensurePost({
+            content: homePositive
+              ? "From the away side, this has felt sloppy and underpowered. The passing lanes have never looked comfortable."
+              : "From the away side, this has been encouraging. The adjustments and final-third intent look much stronger.",
+            threadId: thread.id,
+            authorId: awayAuthor.id,
+            parentId: awayPost.id,
+            createdAt: nextPostTimestamp(thread.id),
+          });
+          seededMatchSentimentPosts += 1;
+        }
+      }
+    }
+
+    console.log(`Seeded ${seededMatchSentimentPosts} sentiment-focused posts into the first two match threads`);
+  }
+
+  const pollTargets = [
+    {
+      thread: thread3,
+      question: "Who will actually finish top of the league from here?",
+      deadline: futureDate(10, 21, 0),
+      options: ["Arsenal", "Liverpool", "Manchester City", "Someone else"],
+      voterIndexes: [0, 1, 3, 4, 5, 8, 9, 12, 15, 18, 21, 24],
+      votePattern: [0, 1, 2, 1, 0, 2, 1, 0, 1, 2, 0, 1],
+    },
+    {
+      thread: thread5,
+      question: "Which position is hardest to leave out of your best XI right now?",
+      deadline: futureDate(8, 18, 30),
+      options: ["Right wing", "Attacking midfield", "Centre-back", "Goalkeeper"],
+      voterIndexes: [2, 6, 7, 10, 11, 13, 16, 17, 19, 22],
+      votePattern: [0, 1, 0, 2, 1, 0, 3, 1, 0, 2],
+    },
+    {
+      thread: thread7,
+      question: "Who has the best chance of grabbing the last Champions League place?",
+      deadline: futureDate(12, 20, 15),
+      options: ["Chelsea", "Newcastle", "Spurs", "A surprise team"],
+      voterIndexes: [0, 5, 7, 9, 14, 20, 23, 25, 27, 29, 31],
+      votePattern: [1, 2, 1, 0, 1, 2, 0, 1, 2, 1, 3],
+    },
+    {
+      thread: thread9,
+      question: "Which young player has improved the fastest this season?",
+      deadline: futureDate(9, 19, 45),
+      options: ["Cole Palmer", "Kobbie Mainoo", "Jarrad Branthwaite", "Other"],
+      voterIndexes: [1, 4, 6, 8, 12, 18, 26, 28, 30, 32],
+      votePattern: [0, 1, 0, 2, 0, 1, 0, 3, 0, 1],
+    },
+    bestAtmosphereThread
+      ? {
+          thread: bestAtmosphereThread,
+          question: "Which ground has delivered the loudest atmosphere lately?",
+          deadline: futureDate(7, 22, 0),
+          options: ["Anfield", "Selhurst Park", "St James' Park", "Emirates Stadium"],
+          voterIndexes: [3, 5, 10, 11, 14, 16, 17, 20, 22, 24, 26, 28],
+          votePattern: [1, 2, 1, 0, 2, 2, 0, 1, 2, 3, 2, 1],
+        }
+      : null,
+    arsenalSupportersThread
+      ? {
+          thread: arsenalSupportersThread,
+          question: "What should Arsenal prioritise next?",
+          deadline: futureDate(11, 17, 50),
+          options: ["Elite striker", "Wide forward depth", "Midfield balance", "Another defender"],
+          voterIndexes: [0, 2, 3, 6, 9, 12, 15, 18, 21, 27, 30, 33],
+          votePattern: [0, 0, 2, 0, 1, 0, 2, 1, 0, 0, 3, 1],
+        }
+      : null,
+  ];
+
+  let seededPollCount = 0;
+  let seededPollVoteCount = 0;
+
+  for (const target of pollTargets) {
+    if (!target) continue;
+
+    const authorId = target.thread.authorId;
+    const pollResult = await ensurePoll({
+      threadId: target.thread.id,
+      authorId,
+      question: target.question,
+      deadline: target.deadline,
+      options: target.options,
+    });
+    seededPollCount += 1;
+
+    for (let index = 0; index < target.voterIndexes.length; index += 1) {
+      const voter = activeSeedUsers[target.voterIndexes[index] % activeSeedUsers.length];
+      if (!voter || voter.id === authorId) continue;
+
+      const option = pollResult.options[target.votePattern[index] % pollResult.options.length];
+      if (!option) continue;
+
+      await ensurePollVote({
+        userId: voter.id,
+        pollOptionId: option.id,
+      });
+      seededPollVoteCount += 1;
+    }
+  }
+
+  console.log(`Ensured ${seededPollCount} polls with ${seededPollVoteCount} votes`);
 
   // ─── Follows ─────────────────────────────────────────────────────────────
   await Promise.all([
