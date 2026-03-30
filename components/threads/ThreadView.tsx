@@ -1100,6 +1100,9 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
   const [reportingPostId, setReportingPostId] = useState<number | null>(null);
   const [reportDrafts, setReportDrafts] = useState<Record<number, string>>({});
   const [reportPendingPostId, setReportPendingPostId] = useState<number | null>(null);
+  const [threadReportDraft, setThreadReportDraft] = useState("");
+  const [showThreadReportForm, setShowThreadReportForm] = useState(false);
+  const [threadReportPending, setThreadReportPending] = useState(false);
   const [pollReportDraft, setPollReportDraft] = useState("");
   const [showPollReportForm, setShowPollReportForm] = useState(false);
   const [pollReportPending, setPollReportPending] = useState(false);
@@ -1261,8 +1264,10 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
     setMatchSentimentError(null);
     setReportToast(null);
     setReportingPostId(null);
+    setShowThreadReportForm(false);
     setShowPollReportForm(false);
     setExpandedEditHistory({});
+    setThreadReportDraft("");
     setPollReportDraft("");
     setPollVotePendingOptionId(null);
     setPollVoteError(null);
@@ -1964,6 +1969,54 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
     }
   };
 
+  const handleThreadReportSubmit = async () => {
+    if (!state.thread) return;
+
+    setReportToast(null);
+    setThreadReportPending(true);
+
+    try {
+      const activeSession = await refreshAccessTokenIfNeeded();
+      setSession(activeSession);
+
+      if (!activeSession) {
+        throw new Error("Sign in to report threads.");
+      }
+
+      const reason = threadReportDraft.trim();
+      if (!reason) {
+        throw new Error("Report reason cannot be empty.");
+      }
+
+      const response = await fetch(`/api/threads/${state.thread.id}/report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${activeSession.accessToken}`,
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not report this thread.");
+      }
+
+      setThreadReportDraft("");
+      setShowThreadReportForm(false);
+      showReportToast("success", "Thread reported. Moderators will review it.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not report this thread.";
+      if (message.toLowerCase().includes("already reported")) {
+        setShowThreadReportForm(false);
+      }
+      showReportToast("error", message);
+    } finally {
+      setThreadReportPending(false);
+    }
+  };
+
   const handlePollVote = async (optionId: number) => {
     if (!poll) return;
 
@@ -2109,6 +2162,10 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
     poll &&
       session?.user &&
       session.user.id !== poll.authorId
+  );
+  const canReportThread = Boolean(
+    session?.user &&
+      session.user.id !== thread.author.id
   );
   const fullDiscussionHref = buildThreadHref(thread.id, sourceContext);
   const loginHref = `/login?next=${encodeURIComponent(fullDiscussionHref)}`;
@@ -2837,31 +2894,108 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
           </div>
         )}
 
-        {canManageThread && !editingThread && (
+        {(canManageThread || canReportThread) && !editingThread && (
           <div className="mt-5 flex justify-end">
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={handleStartThreadEdit}
-                disabled={threadActionPending}
-                className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Edit thread
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDeleteThread()}
-                disabled={threadActionPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                {threadActionPending ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-                {threadActionPending ? "Working..." : "Delete thread"}
-              </button>
+              {canReportThread && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportToast(null);
+                    setReportingPostId(null);
+                    setEditingPostId(null);
+                    setReplyParentId(null);
+                    setShowPollReportForm(false);
+                    setShowThreadReportForm((current) => !current);
+                  }}
+                  disabled={threadReportPending}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-700 transition hover:border-amber-500/45 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {threadReportPending ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Flag className="h-4 w-4" />
+                  )}
+                  {threadReportPending ? "Reporting..." : "Report thread"}
+                </button>
+              )}
+              {canManageThread && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleStartThreadEdit}
+                    disabled={threadActionPending}
+                    className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Edit thread
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteThread()}
+                    disabled={threadActionPending}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:border-red-500/45 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                  >
+                    {threadActionPending ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    {threadActionPending ? "Working..." : "Delete thread"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showThreadReportForm && canReportThread && (
+          <div className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4">
+            <label className="block text-sm font-medium text-[color:var(--foreground)]">
+              Tell moderators what is wrong with this thread
+            </label>
+            <textarea
+              value={threadReportDraft}
+              onChange={(event) => {
+                setReportToast(null);
+                setThreadReportDraft(event.target.value);
+              }}
+              disabled={threadReportPending}
+              placeholder="Briefly explain why this thread should be reviewed..."
+              rows={3}
+              maxLength={500}
+              className="mt-3 w-full rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-amber-500/45 focus:ring-2 focus:ring-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs text-[color:var(--muted-foreground)]">
+                {threadReportDraft.trim().length}/500 characters
+              </span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearReportFeedback();
+                    setShowThreadReportForm(false);
+                  }}
+                  disabled={threadReportPending}
+                  className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleThreadReportSubmit()}
+                  disabled={threadReportPending || !threadReportDraft.trim()}
+                  className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {threadReportPending ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Flag className="h-4 w-4" />
+                  )}
+                  {threadReportPending ? "Submitting..." : "Submit report"}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3150,5 +3284,4 @@ export default function ThreadView({ threadId }: ThreadViewProps) {
     </section>
   );
 }
-
 
