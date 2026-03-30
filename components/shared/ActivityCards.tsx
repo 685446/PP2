@@ -92,7 +92,7 @@ export function MatchActivityCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:p-5 ${
+      className={`group block max-w-full overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] sm:p-5 ${
         className ?? ""
       }`}
       aria-label={ariaLabel}
@@ -166,7 +166,7 @@ export function DiscussionActivityCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] ${
+      className={`group block max-w-full overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 shadow-[0_8px_22px_rgba(2,8,23,0.06)] transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] ${
         className ?? ""
       }`}
       aria-label={ariaLabel}

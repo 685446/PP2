@@ -122,6 +122,14 @@ function mapEntityHref(item: ApiFeedItem): string {
     return `/matches?matchId=${item.entity.id}&source=feed`;
   }
 
+  if (
+    item.type === "FAVORITE_TEAM_THREAD_GROUP" &&
+    item.entity.kind === "thread" &&
+    typeof item.entity.teamId === "number"
+  ) {
+    return `/communities/${item.entity.teamId}`;
+  }
+
   if (item.entity.kind === "thread") {
     return buildThreadHref(item.entity.id, {
       source: "feed",

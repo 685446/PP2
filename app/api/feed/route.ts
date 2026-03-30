@@ -117,10 +117,9 @@ type FeedEvent =
   | ReturnType<typeof eventFromPostInMyThread>
   | ReturnType<typeof eventFromPostsInMyThreadGroup>
   | ReturnType<typeof eventFromNewFollower>
-  | ReturnType<typeof eventFromFavoriteTeamMatch>
   | ReturnType<typeof eventFromFavoriteTeamThread>
   | ReturnType<typeof eventFromFavoriteTeamThreadGroup>
-  | ReturnType<typeof eventFromFavoriteTeamMatchThread>;
+  ;
 
 function buildPreviewText(value: unknown, fallback = "No preview available yet.") {
   if (typeof value !== "string") return fallback;
@@ -534,9 +533,7 @@ export async function GET(request: NextRequest) {
       repliesToMyPosts,
       postsInMyThreads,
       newFollowers,
-      favoriteTeamMatches,
       favoriteTeamThreads,
-      favoriteTeamMatchThreads,
     ] = await Promise.all([
       followedUserIds.length
         ? prisma.thread.findMany({
@@ -690,33 +687,6 @@ export async function GET(request: NextRequest) {
         },
       }),
       favoriteTeamId
-        ? prisma.match.findMany({
-            where: {
-              OR: [
-                { homeTeamId: favoriteTeamId },
-                { awayTeamId: favoriteTeamId },
-              ],
-              status: "FINISHED",
-              // Guard against old fixtures resurfacing when sync touches updatedAt.
-              utcDate: { gte: since },
-              updatedAt: { gte: since },
-            },
-            take: SOURCE_LIMIT,
-            orderBy: { updatedAt: "desc" },
-            include: {
-              homeTeam: {
-                select: { id: true, name: true, shortName: true, crestUrl: true },
-              },
-              awayTeam: {
-                select: { id: true, name: true, shortName: true, crestUrl: true },
-              },
-              thread: {
-                select: { id: true },
-              },
-            },
-          })
-        : Promise.resolve([]),
-      favoriteTeamId
         ? prisma.thread.findMany({
             where: {
               authorId: { not: user.id },
@@ -737,60 +707,11 @@ export async function GET(request: NextRequest) {
             },
           })
         : Promise.resolve([]),
-      favoriteTeamId
-        ? prisma.thread.findMany({
-            where: {
-              authorId: { not: user.id },
-              type: "MATCH",
-              isHidden: false,
-              openAt: { lte: now },
-              closedAt: null,
-              match: {
-                OR: [
-                  { homeTeamId: favoriteTeamId },
-                  { awayTeamId: favoriteTeamId },
-                ],
-              },
-            },
-            take: SOURCE_LIMIT,
-            orderBy: { openAt: "desc" },
-            include: {
-              author: {
-                select: { id: true, username: true, avatar: true },
-              },
-              match: {
-                select: {
-                  id: true,
-                  matchWeek: true,
-                  season: true,
-                  status: true,
-                  utcDate: true,
-                  homeScore: true,
-                  awayScore: true,
-                  homeTeam: {
-                    select: { id: true, name: true, shortName: true, crestUrl: true },
-                  },
-                  awayTeam: {
-                    select: { id: true, name: true, shortName: true, crestUrl: true },
-                  },
-                },
-              },
-            },
-          })
-        : Promise.resolve([]),
     ]);
 
-    // Avoid duplicate cards for the same match when a match-thread event also exists.
-    const matchIdsWithThreadEvents = new Set(
-      favoriteTeamMatchThreads
-        .map((thread) => thread.match?.id)
-        .filter((id): id is number => typeof id === "number")
-    );
     const threadIdsForDirectPosts = [
       ...new Set(
-        [...followedThreads, ...favoriteTeamThreads, ...favoriteTeamMatchThreads].map(
-          (thread) => thread.id
-        )
+        [...followedThreads, ...favoriteTeamThreads].map((thread) => thread.id)
       ),
     ];
     const postIdsForDirectReplies = [
@@ -834,10 +755,6 @@ export async function GET(request: NextRequest) {
         .map((row) => [row.parentId, row._count._all])
     );
 
-    const favoriteTeamMatchesWithoutThreadEvent = favoriteTeamMatches.filter(
-      (match) => !matchIdsWithThreadEvents.has(match.id)
-    );
-
     const repliesToMyPostGroups = groupPostsByParentId(repliesToMyPosts);
     const postsInMyThreadGroups = groupPostsByThreadId(postsInMyThreads);
 
@@ -877,16 +794,7 @@ export async function GET(request: NextRequest) {
       ...replyEvents,
       ...threadActivityEvents,
       ...newFollowers.map((follow) => eventFromNewFollower(follow)),
-      ...favoriteTeamMatchesWithoutThreadEvent.map((match) =>
-        eventFromFavoriteTeamMatch(match, favoriteTeamId as number)
-      ),
       ...favoriteTeamThreadEvents,
-      ...favoriteTeamMatchThreads.map((thread) =>
-        eventFromFavoriteTeamMatchThread(
-          thread,
-          directPostCountByThreadId.get(thread.id) || 0
-        )
-      ),
     ];
 
     const uniqueEventById = new Map(events.map((event) => [event.id, event]));

@@ -545,7 +545,7 @@ function FeedComposerPromptCard({
     <button
       type="button"
       onClick={onOpenComposer}
-      className="group relative w-full overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 text-left shadow-[0_10px_26px_rgba(2,8,23,0.12)] transition hover:border-sky-500/50 hover:shadow-[0_16px_36px_rgba(2,132,199,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+      className="group relative block w-full max-w-full overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 text-left shadow-[0_10px_26px_rgba(2,8,23,0.12)] transition hover:border-sky-500/50 hover:shadow-[0_16px_36px_rgba(2,132,199,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
       aria-label="Open create thread composer"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(14,165,233,0.18),transparent_55%),radial-gradient(circle_at_100%_100%,rgba(56,189,248,0.14),transparent_50%)]" />
@@ -562,8 +562,8 @@ function FeedComposerPromptCard({
             : "Sign in to create threads, post replies, and join live matchday conversations."}
         </p>
 
-        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 transition group-hover:border-sky-500/45">
-          <p className="text-sm text-[color:var(--muted-foreground)]">
+        <div className="mt-4 flex min-w-0 items-center justify-between gap-4 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-4 py-3 transition group-hover:border-sky-500/45">
+          <p className="min-w-0 flex-1 break-words text-sm text-[color:var(--muted-foreground)]">
             {isAuthenticated ? "What are your predictions for this weekend?" : "Tap to sign in and start posting your own threads."}
           </p>
           <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_10px_20px_rgba(2,132,199,0.28)]">
@@ -1375,18 +1375,18 @@ export default function HomeFeedShell() {
   }, [composer, resetComposer, router]);
 
   return (
-    <section className="space-y-6">
-      <div className="mx-auto w-full max-w-[1240px]">
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,760px)_320px] xl:justify-center">
-          <div className="space-y-4">
-          <div className="flex items-center justify-between">
+    <section className="max-w-full overflow-x-clip space-y-6">
+      <div className="mx-auto w-full max-w-[1240px] px-3 sm:px-4 xl:px-0">
+        <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,760px)_320px] xl:justify-center">
+          <div className="min-w-0 space-y-4">
+          <div className="flex min-w-0 items-center justify-between">
             <div ref={activityMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setIsActivityMenuOpen((open) => !open)}
                 aria-expanded={isActivityMenuOpen}
                 aria-haspopup="menu"
-                className="inline-flex h-11 min-w-[230px] items-center justify-between rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 text-sm text-[color:var(--foreground)] shadow-[0_8px_20px_rgba(2,8,23,0.06)] transition hover:bg-[color:var(--surface-elevated)]"
+                className="inline-flex h-11 max-w-full min-w-0 items-center justify-between rounded-full border border-[color:var(--surface-border)] bg-[color:var(--surface)] px-4 text-sm text-[color:var(--foreground)] shadow-[0_8px_20px_rgba(2,8,23,0.06)] transition hover:bg-[color:var(--surface-elevated)] sm:min-w-[230px]"
               >
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 shrink-0 text-sky-500" />
@@ -1401,7 +1401,7 @@ export default function HomeFeedShell() {
               </button>
 
               {isActivityMenuOpen && (
-                <div className="absolute left-0 top-full z-30 mt-2 w-[280px] overflow-hidden rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_12px_24px_rgba(2,8,23,0.16)]">
+                <div className="absolute left-0 top-full z-30 mt-2 w-[min(280px,calc(100vw-2rem))] max-w-full overflow-hidden rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] shadow-[0_12px_24px_rgba(2,8,23,0.16)]">
                   <div className="max-h-72 overflow-auto p-1.5">
                     <button
                       type="button"

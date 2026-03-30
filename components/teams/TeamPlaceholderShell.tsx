@@ -290,8 +290,8 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
   }, [standingRows, standingSnapshot]);
 
   return (
-    <section className="mx-auto w-full max-w-[1120px] space-y-5">
-      <Link href="/teams" className="btn-secondary inline-flex items-center gap-2">
+    <section className="mx-auto w-full max-w-[1120px] max-w-full overflow-x-clip space-y-5 px-3 sm:px-4 xl:px-0">
+      <Link href="/teams" className="btn-secondary inline-flex max-w-full items-center gap-2">
         <ArrowLeft className="h-4 w-4" />
         Back to Teams
       </Link>
@@ -310,37 +310,43 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
 
       {state === "ready" && team && (
         <>
-          <div className="relative overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-6 shadow-[0_12px_28px_rgba(2,8,23,0.1)]">
+          <div className="relative max-w-full overflow-hidden rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5 shadow-[0_12px_28px_rgba(2,8,23,0.1)] sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_8%_0%,rgba(56,189,248,0.14),transparent_58%),radial-gradient(120%_90%_at_100%_0%,rgba(16,185,129,0.1),transparent_62%)]" />
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
+            <div className="relative flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
                 {team.crestUrl ? (
-                  <img src={team.crestUrl} alt={`${team.name} crest`} className="h-14 w-14 object-contain" />
+                  <img
+                    src={team.crestUrl}
+                    alt={`${team.name} crest`}
+                    className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
+                  />
                 ) : (
-                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)]">
+                  <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] sm:h-16 sm:w-16">
                     <Shield className="h-7 w-7 text-[color:var(--muted-foreground)]" />
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--brand-accent)]">
                     Team
                   </p>
-                  <h1 className="mt-1 text-3xl font-bold text-[color:var(--foreground)]">{team.name}</h1>
-                  <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+                  <h1 className="mt-1 text-3xl font-bold leading-[0.95] text-[color:var(--foreground)] [overflow-wrap:anywhere] sm:text-5xl">
+                    {team.name}
+                  </h1>
+                  <p className="mt-2 text-sm text-[color:var(--muted-foreground)] [overflow-wrap:anywhere]">
                     {team.shortName} - {team.venue}
                   </p>
                 </div>
               </div>
-              <p className="text-xs text-[color:var(--muted-foreground)]">
+              <p className="text-xs text-[color:var(--muted-foreground)] sm:text-right">
                 Last synced {new Date(team.updatedAt).toLocaleDateString()}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0 space-y-4">
               <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5">
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[color:var(--foreground)]">
                     <CalendarDays className="h-5 w-5" />
                     Fixtures
@@ -364,7 +370,7 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
                       }}
                       className="cursor-pointer rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-4 transition hover:border-sky-400/45 hover:bg-[color:var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-400/55 focus:ring-offset-2 focus:ring-offset-[color:var(--surface-elevated)]"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
                           Next Match
                         </p>
@@ -386,7 +392,7 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
                               <Shield className="h-6 w-6 text-[color:var(--muted-foreground)]" />
                             </div>
                           )}
-                          <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+                          <p className="max-w-full text-sm font-semibold text-[color:var(--foreground)] [overflow-wrap:anywhere]">
                             <Link
                               href={`/teams/${nextMatch.homeTeam.id}`}
                               onClick={(event) => event.stopPropagation()}
@@ -424,7 +430,7 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
                               <Shield className="h-6 w-6 text-[color:var(--muted-foreground)]" />
                             </div>
                           )}
-                          <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+                          <p className="max-w-full text-sm font-semibold text-[color:var(--foreground)] [overflow-wrap:anywhere]">
                             <Link
                               href={`/teams/${nextMatch.awayTeam.id}`}
                               onClick={(event) => event.stopPropagation()}
@@ -445,7 +451,7 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
                   )}
 
                   <div className="mt-3 rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
                         Form (last 5)
                       </p>
@@ -457,11 +463,11 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
                         Not enough completed matches to show form yet.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-5 gap-2">
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                         {recentForm.map((entry) => (
                           <div
                             key={`form-${entry.matchId}`}
-                            className="rounded-lg border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2 py-2 text-center"
+                            className="min-w-0 rounded-lg border border-[color:var(--surface-border)] bg-[color:var(--surface-elevated)] px-2 py-2 text-center"
                           >
                             <span
                               className={`inline-flex min-w-[30px] items-center justify-center rounded-md px-2 py-0.5 text-xs font-bold ${
@@ -539,7 +545,7 @@ export default function TeamPlaceholderShell({ teamId }: TeamPlaceholderShellPro
               </div>
             </div>
 
-            <aside className="space-y-4">
+            <aside className="min-w-0 space-y-4">
               <div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--surface)] p-5">
                 <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[color:var(--foreground)]">
                   <Trophy className="h-5 w-5" />
