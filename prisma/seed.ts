@@ -10,6 +10,7 @@ const SYSTEM_USER_BIO =
   "Automated account for match threads and moderation actions";
 const seededThreadCreatedAt = new Map<number, Date>();
 const threadActivityOffsets = new Map<number, number>();
+const INTERVIEW_ACTIVITY_CUTOFF = new Date("2026-04-01T23:59:59.999-04:00");
 
 function recentDate(daysAgo: number, hour: number, minute = 0) {
   const date = new Date();
@@ -397,6 +398,48 @@ async function ensureUserReport(data: {
       reporterId: data.reporterId,
       targetType: "USER",
       reportedUserId: data.reportedUserId,
+      reason: data.reason,
+      status: data.status ?? "PENDING",
+      createdAt: data.createdAt,
+    },
+  });
+}
+
+async function ensureContentReport(data: {
+  reporterId: number;
+  targetType: "POST" | "THREAD";
+  reason: string;
+  createdAt: Date;
+  status?: "PENDING" | "APPROVED" | "DISMISSED";
+  postId?: number;
+  threadId?: number;
+}) {
+  const existing = await prisma.report.findFirst({
+    where: {
+      reporterId: data.reporterId,
+      targetType: data.targetType,
+      postId: data.postId ?? null,
+      threadId: data.threadId ?? null,
+      reason: data.reason,
+    },
+  });
+
+  if (existing) {
+    return prisma.report.update({
+      where: { id: existing.id },
+      data: {
+        status: data.status ?? "PENDING",
+        createdAt: data.createdAt,
+      },
+    });
+  }
+
+  return prisma.report.create({
+    data: {
+      reporterId: data.reporterId,
+      targetType: data.targetType,
+      postId: data.postId ?? null,
+      threadId: data.threadId ?? null,
       reason: data.reason,
       status: data.status ?? "PENDING",
       createdAt: data.createdAt,
@@ -2466,6 +2509,8 @@ async function main() {
   let multilingualCursor = 0;
 
   for (const [threadIndex, thread] of allDiscussionThreads.entries()) {
+    if (thread.openAt > INTERVIEW_ACTIVITY_CUTOFF) continue;
+
     const totalGeneratedComments = thread.id % 11;
     if (totalGeneratedComments === 0) continue;
 
@@ -2626,6 +2671,9 @@ async function main() {
     where: {
       type: "MATCH",
       isHidden: false,
+      openAt: {
+        lte: INTERVIEW_ACTIVITY_CUTOFF,
+      },
       match: {
         isNot: null,
       },
@@ -2799,6 +2847,7 @@ async function main() {
 
   let seededPollCount = 0;
   let seededPollVoteCount = 0;
+  const pollByThreadId = new Map<number, Awaited<ReturnType<typeof ensurePoll>>>();
 
   for (const target of pollTargets) {
     if (!target) continue;
@@ -2811,6 +2860,7 @@ async function main() {
       deadline: target.deadline,
       options: target.options,
     });
+    pollByThreadId.set(target.thread.id, pollResult);
     seededPollCount += 1;
 
     for (let index = 0; index < target.voterIndexes.length; index += 1) {
@@ -2829,6 +2879,55 @@ async function main() {
   }
 
   console.log(`Ensured ${seededPollCount} polls with ${seededPollVoteCount} votes`);
+
+  const titleRacePoll = pollByThreadId.get(thread3.id) ?? null;
+
+  await Promise.all([
+    ensureContentReport({
+      reporterId: users[5].id,
+      targetType: "THREAD",
+      threadId: thread2.id,
+      reason: "Transfer thread has drifted into repetitive rumor spam and should be reviewed.",
+      status: "PENDING",
+      createdAt: recentDate(4, 20, 5),
+    }),
+    ensureContentReport({
+      reporterId: users[8].id,
+      targetType: "THREAD",
+      threadId: thread6.id,
+      reason: "Thread framing is pushing bait more than actual discussion.",
+      status: "APPROVED",
+      createdAt: recentDate(3, 18, 40),
+    }),
+    ensureContentReport({
+      reporterId: users[9].id,
+      targetType: "POST",
+      postId: p7.id,
+      reason: "This comment feels like a low-effort pile-on instead of football discussion.",
+      status: "PENDING",
+      createdAt: recentDate(2, 21, 10),
+    }),
+    ensureContentReport({
+      reporterId: users[10].id,
+      targetType: "POST",
+      postId: r4.id,
+      reason: "Reply escalated the tone and nudged the thread toward personal digs.",
+      status: "DISMISSED",
+      createdAt: recentDate(2, 22, 5),
+    }),
+    ...(titleRacePoll
+      ? [
+          ensureContentReport({
+            reporterId: users[11].id,
+            targetType: "THREAD",
+            threadId: thread3.id,
+            reason: "Poll report: Options feel misleading and are likely to provoke fanbase baiting.",
+            status: "PENDING" as const,
+            createdAt: recentDate(1, 19, 25),
+          }),
+        ]
+      : []),
+  ]);
 
   // ─── Follows ─────────────────────────────────────────────────────────────
   await Promise.all([
